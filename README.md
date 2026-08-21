@@ -17,10 +17,10 @@
   <a href="SECURITY.md"><strong>Security</strong></a>
 </p>
 
-OmaQuickCalc brings live math, conversions, currencies, timezones, and history
-to one fast floating input. Summon it, type naturally, and press Enter to copy
-the result. When useful, Transform in Place can send an answer directly back
-to selected text in another app.
+OmaQuickCalc is the calculator you summon, not switch to. Type math or
+plain-language conversions into a Raycast-inspired palette and get a live,
+copy-ready answer. When the result belongs in the app you came from, Transform
+in Place can put it there.
 
 ## Examples
 
