@@ -20,8 +20,6 @@ plain-language conversions into a focused floating palette and get a live,
 copy-ready answer. When the result belongs in the app you came from, Transform
 in Place can put it there.
 
-[![Play the OmaQuickCalc demo](assets/omaquickcalc-demo-poster.png)](https://raw.githubusercontent.com/camerontucker/omaquickcalc/main/assets/omaquickcalc-demo.gif)
-
 ## Examples
 
 **Design units**
