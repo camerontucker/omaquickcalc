@@ -1,8 +1,7 @@
 # OmaQuickCalc
 
 <p align="center">
-  <strong>Calculate anything without leaving your flow.</strong><br>
-  A fast modal calculator for Omarchy Quattro, with Transform in Place.
+  A fast modal calculator for Omarchy Quattro.
 </p>
 
 ![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
