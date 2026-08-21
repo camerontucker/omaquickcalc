@@ -1,5 +1,6 @@
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import tempfile
@@ -11,6 +12,13 @@ from unittest.mock import patch
 import omaquickcalc_setup as setup
 
 PLUGIN_ID = "io.github.camerontucker.omaquickcalc"
+REPOSITORY = Path(__file__).resolve().parents[1]
+CURRENT_VERSION = json.loads(
+    (REPOSITORY / "manifest.json").read_text(encoding="utf-8")
+)["version"]
+_VERSION_PARTS = [int(part) for part in CURRENT_VERSION.split(".")]
+UPGRADE_VERSION = f"{_VERSION_PARTS[0]}.{_VERSION_PARTS[1]}.{_VERSION_PARTS[2] + 1}"
+SECOND_UPGRADE_VERSION = f"{_VERSION_PARTS[0]}.{_VERSION_PARTS[1]}.{_VERSION_PARTS[2] + 2}"
 
 
 class ShortcutTests(unittest.TestCase):
@@ -52,6 +60,35 @@ class ShortcutTests(unittest.TestCase):
             self.assertFalse(result["ok"])
             self.assertEqual(path.read_text(encoding="utf-8"), original)
 
+    def test_apply_preserves_a_symlinked_bindings_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "dotfiles" / "bindings.lua"
+            target.parent.mkdir()
+            target.write_text("-- managed by dotfiles\n", encoding="utf-8")
+            path = root / "config" / "hypr" / "bindings.lua"
+            path.parent.mkdir(parents=True)
+            path.symlink_to(target)
+
+            result = setup.apply_shortcut(path, "SUPER + ALT + Q", PLUGIN_ID, False)
+
+            self.assertTrue(result["ok"])
+            self.assertTrue(path.is_symlink())
+            self.assertIn("-- managed by dotfiles", target.read_text(encoding="utf-8"))
+            self.assertIn(setup.BINDING_START, target.read_text(encoding="utf-8"))
+
+    def test_apply_refuses_a_dangling_bindings_symlink(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "config" / "hypr" / "bindings.lua"
+            path.parent.mkdir(parents=True)
+            path.symlink_to(root / "missing" / "bindings.lua")
+
+            with self.assertRaisesRegex(OSError, "dangling symlink"):
+                setup.apply_shortcut(path, "SUPER + ALT + Q", PLUGIN_ID, False)
+
+            self.assertTrue(path.is_symlink())
+
     def test_failed_cleanup_validation_restores_owned_binding(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "bindings.lua"
@@ -71,7 +108,7 @@ class LifecycleTests(unittest.TestCase):
             current = root / f"{PLUGIN_ID}.desktop"
             legacy = root / "omaquickcalc.desktop"
             bindings = root / "bindings.lua"
-            setup.ensure_launcher(current, PLUGIN_ID, "0.5.0")
+            setup.ensure_launcher(current, PLUGIN_ID, CURRENT_VERSION)
             setup.ensure_launcher(legacy, "omaquickcalc", "0.4.0")
             result = setup.cleanup(current, bindings, False, (legacy,))
             self.assertTrue(result["ok"])
@@ -84,11 +121,14 @@ class LifecycleTests(unittest.TestCase):
             desktop = root / "applications" / f"{PLUGIN_ID}.desktop"
             bindings = root / "hypr" / "bindings.lua"
 
-            created = setup.ensure_launcher(desktop, PLUGIN_ID, "0.5.0")
-            upgraded = setup.ensure_launcher(desktop, PLUGIN_ID, "0.5.1")
+            created = setup.ensure_launcher(desktop, PLUGIN_ID, CURRENT_VERSION)
+            upgraded = setup.ensure_launcher(desktop, PLUGIN_ID, UPGRADE_VERSION)
             self.assertEqual(created["action"], "created")
             self.assertEqual(upgraded["action"], "updated")
-            self.assertIn("X-OmaQuickCalc-Version=0.5.1", desktop.read_text(encoding="utf-8"))
+            self.assertIn(
+                f"X-OmaQuickCalc-Version={UPGRADE_VERSION}",
+                desktop.read_text(encoding="utf-8"),
+            )
 
             setup.apply_shortcut(bindings, "SUPER + ALT + Q", PLUGIN_ID, False)
             removed = setup.cleanup(desktop, bindings, False)
@@ -97,7 +137,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertNotIn(setup.BINDING_START, bindings.read_text(encoding="utf-8"))
 
             desktop.write_text("[Desktop Entry]\nName=User file\n", encoding="utf-8")
-            conflict = setup.ensure_launcher(desktop, PLUGIN_ID, "0.5.2")
+            conflict = setup.ensure_launcher(desktop, PLUGIN_ID, SECOND_UPGRADE_VERSION)
             self.assertFalse(conflict["ok"])
             self.assertEqual(desktop.read_text(encoding="utf-8"), "[Desktop Entry]\nName=User file\n")
 
@@ -125,7 +165,7 @@ class LifecycleTests(unittest.TestCase):
             })
 
             installed = subprocess.run(
-                [str(helper), "ensure-launcher", "--version", "0.5.0"],
+                [str(helper), "ensure-launcher", "--version", CURRENT_VERSION],
                 check=True, capture_output=True, text=True, env=environment,
             )
             self.assertEqual(json.loads(installed.stdout)["action"], "created")
@@ -133,16 +173,30 @@ class LifecycleTests(unittest.TestCase):
             if shutil.which("desktop-file-validate"):
                 subprocess.run(["desktop-file-validate", str(desktop)], check=True)
 
-            if shutil.which("gtk-launch"):
+            exec_line = next(
+                line.removeprefix("Exec=")
+                for line in desktop.read_text(encoding="utf-8").splitlines()
+                if line.startswith("Exec=")
+            )
+            launch_command = shlex.split(exec_line)
+            self.assertEqual(
+                launch_command,
+                ["omarchy-shell", "shell", "summon", PLUGIN_ID, "{}"],
+            )
+            if shutil.which("gtk-launch") and (
+                environment.get("DISPLAY") or environment.get("WAYLAND_DISPLAY")
+            ):
                 subprocess.run(["gtk-launch", PLUGIN_ID], check=True, env=environment)
-                for _ in range(20):
-                    if launch_log.exists():
-                        break
-                    time.sleep(0.05)
-                self.assertEqual(
-                    launch_log.read_text(encoding="utf-8").strip(),
-                    f"shell summon {PLUGIN_ID} {{}}",
-                )
+            else:
+                subprocess.run(launch_command, check=True, env=environment)
+            for _ in range(20):
+                if launch_log.exists():
+                    break
+                time.sleep(0.05)
+            self.assertEqual(
+                launch_log.read_text(encoding="utf-8").strip(),
+                f"shell summon {PLUGIN_ID} {{}}",
+            )
 
             subprocess.run(
                 [str(helper), "apply-shortcut", "SUPER + ALT + Q", "--no-reload"],
@@ -152,7 +206,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertIn(setup.BINDING_START, bindings.read_text(encoding="utf-8"))
 
             upgraded = subprocess.run(
-                [str(helper), "ensure-launcher", "--version", "0.5.1"],
+                [str(helper), "ensure-launcher", "--version", UPGRADE_VERSION],
                 check=True, capture_output=True, text=True, env=environment,
             )
             self.assertEqual(json.loads(upgraded.stdout)["action"], "updated")
@@ -191,7 +245,7 @@ class LifecycleTests(unittest.TestCase):
                 "OMAQUICKCALC_REMOVE_LOG": str(removal_log),
             })
             subprocess.run(
-                [str(helper), "ensure-launcher", "--version", "0.5.0"],
+                [str(helper), "ensure-launcher", "--version", CURRENT_VERSION],
                 check=True, capture_output=True, text=True, env=environment,
             )
             subprocess.run(

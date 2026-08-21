@@ -819,7 +819,10 @@ def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
         lambda value: date_evaluation(value, clock_format),
         lambda value: design_evaluation(value, rem_px, workday_hours),
     ):
-        result = evaluator(text)
+        try:
+            result = evaluator(text)
+        except (OverflowError, ValueError, ZeroDivisionError):
+            return Evaluation(False, error="Calculation is out of range")
         if result is not None:
             result.normalizedExpression = text
             return result

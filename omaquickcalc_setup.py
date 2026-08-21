@@ -133,8 +133,13 @@ Exec=omarchy-shell shell summon {plugin_id} {{\"setup\":true}}
 
 
 def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    if path.is_symlink() and not path.exists():
+        raise OSError(f"Refusing to write through dangling symlink: {path}")
+    write_path = path.resolve() if path.is_symlink() else path
+    write_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{write_path.name}.", dir=write_path.parent
+    )
     temp_path = Path(temporary)
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -143,7 +148,7 @@ def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
             os.fsync(handle.fileno())
         if mode is not None:
             temp_path.chmod(mode)
-        os.replace(temp_path, path)
+        os.replace(temp_path, write_path)
     finally:
         if temp_path.exists():
             temp_path.unlink()

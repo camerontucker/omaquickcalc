@@ -108,6 +108,20 @@ class StructuredEvaluatorTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertEqual(result.kind, "timezone")
 
+    def test_incomplete_or_out_of_range_live_input_never_crashes(self):
+        expressions = (
+            "rgb(.., 0, 0)",
+            "10 px in inches at 0 ppi",
+            "workhours in 0000",
+            "March 4 + 999999999999999999999 days",
+            "time in " + "9" * 400 + " hours",
+        )
+        for expression in expressions:
+            with self.subTest(expression=expression[:40]):
+                result = backend.evaluate(expression)
+                self.assertFalse(result.ok)
+                self.assertEqual(result.error, "Calculation is out of range")
+
 
 if __name__ == "__main__":
     unittest.main()
