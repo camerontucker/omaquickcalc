@@ -14,6 +14,8 @@
   `io.github.camerontucker.omaquickcalc`.
 - Expand Raycast-style calculations, history, actions, formats, transparency,
   dependency recovery, and copy-result behavior.
+- Promote valid answers to an expanding, left-aligned result row with stronger
+  typography, full-width conversion space, metadata, and a visible copy hint.
 - Keep incomplete and out-of-range live expressions from crashing the bundled
   evaluator while the user types.
 - Add automated release-contract, lifecycle, evaluator, shell, Python, and QML

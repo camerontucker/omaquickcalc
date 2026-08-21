@@ -59,8 +59,9 @@ Also try `square root of 625`, `$2.5m in cad`,
 `March 4, 2030 + 45 days`, `90 mins to timespan`, `18% tip on 80`, or
 `16 h in workdays`.
 
-The result updates while you type. Press Enter or click the result to copy the
-answer and close; use `Ctrl+Enter` to copy without leaving the palette.
+The card stays compact while empty, then expands to give a valid answer its own
+high-contrast result row. Press Enter or click the result to copy the answer and
+close; use `Ctrl+Enter` to copy without leaving the palette.
 
 ## Why it feels at home in Omarchy
 

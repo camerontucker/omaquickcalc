@@ -120,6 +120,17 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('"--expression", root.activeExpression', qml)
         self.assertNotRegex(qml, r"bash.*(?:expression|evaluatedResult|activeExpression|result)")
 
+    def test_valid_result_uses_a_distinct_copyable_second_row(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn(
+            "readonly property int resultRowHeight: result.length > 0",
+            qml,
+        )
+        self.assertIn("id: resultRow", qml)
+        self.assertIn('text: "↵ Copy"', qml)
+        self.assertIn("Math.round(Style.font.heading * 1.5)", qml)
+        self.assertIn('onClicked: root.submit("copy-close")', qml)
+
 
 if __name__ == "__main__":
     unittest.main()

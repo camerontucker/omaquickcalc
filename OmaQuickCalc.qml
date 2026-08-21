@@ -130,7 +130,8 @@ Item {
   readonly property int cornerRadius: Style.cornerRadius
   readonly property int contentMargin: Style.space(18)
   readonly property int rowContentHeight: Math.max(Style.space(36), Style.font.heading + Style.space(8))
-  readonly property int baseCardHeight: rowContentHeight + contentMargin * 2
+  readonly property int resultRowHeight: result.length > 0 ? Style.space(68) : 0
+  readonly property int baseCardHeight: rowContentHeight + resultRowHeight + contentMargin * 2
   readonly property var displayHistory: CalcModel.filterHistory(history, historyQuery)
   readonly property int visibleHistoryRows: Math.min(5, displayHistory.length)
   readonly property int historyExtraHeight: historyOpen
@@ -1465,6 +1466,10 @@ Item {
       borderSpec: root.borderSpec
       padding: root.contentMargin
 
+      Behavior on height {
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+      }
+
       MouseArea {
         anchors.fill: parent
         onClicked: {
@@ -1646,6 +1651,7 @@ Item {
             clip: true
             text: root.expression
             color: root.foreground
+            opacity: root.result.length > 0 ? 0.72 : 1
             selectionColor: Style.selectionFill
             selectedTextColor: root.foreground
             font.family: root.fontFamily
@@ -1666,78 +1672,122 @@ Item {
             id: outputArea
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            width: (root.result || root.visibleStatus)
+            width: (!root.result && root.visibleStatus)
               ? Math.min(Style.space(310), parent.width * 0.47)
               : 0
             height: parent.height
             visible: width > 0
 
-            Rectangle {
-              id: outputDivider
-              width: Math.max(1, Style.space(1))
-              height: Math.round(parent.height * 0.58)
+            Text {
               anchors.left: parent.left
+              anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              color: root.border
-              opacity: 0.7
+              text: root.visibleStatus
+              color: root.statusIsError ? root.urgent : root.foreground
+              opacity: root.statusIsError ? 1 : 0.5
+              font.family: root.fontFamily
+              font.pixelSize: root.visibleStatus.length > 32 ? Style.font.title : Style.font.heading
+              horizontalAlignment: Text.AlignRight
+              elide: Text.ElideLeft
             }
 
+            MouseArea {
+              anchors.fill: parent
+              enabled: !root.backendAvailable && root.backendChecked
+              cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+              onClicked: root.requestDependencyInstall()
+            }
+          }
+        }
+
+        Item {
+          id: resultRow
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: inputRow.bottom
+          height: root.resultRowHeight
+          visible: height > 0 && !root.setupOpen
+
+          Rectangle {
+            id: resultDivider
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(1, Style.space(1))
+            color: root.border
+            opacity: 0.62
+          }
+
+          Item {
+            id: resultContent
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: resultDivider.bottom
+            anchors.bottom: parent.bottom
+            anchors.topMargin: Style.space(7)
+
             Rectangle {
-              id: colorSwatch
+              id: resultColorSwatch
               visible: root.resultColor.length > 0
-              width: visible ? Style.space(20) : 0
+              width: visible ? Style.space(26) : 0
               height: width
               radius: Math.max(2, root.cornerRadius - Style.space(5))
-              anchors.left: outputDivider.right
-              anchors.leftMargin: visible ? Style.spacing.md : 0
+              anchors.left: parent.left
               anchors.verticalCenter: parent.verticalCenter
               color: root.resultColor || "transparent"
               border.width: visible ? 1 : 0
               border.color: root.border
             }
 
-            Column {
-              id: outputColumn
-              anchors.left: colorSwatch.visible ? colorSwatch.right : outputDivider.right
-              anchors.leftMargin: Style.spacing.md
+            Text {
+              id: copyResultHint
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              spacing: 0
+              text: "↵ Copy"
+              color: root.foreground
+              opacity: 0.46
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
 
-              Text {
-                width: outputColumn.width
-                text: root.result ? root.displayResult : root.visibleStatus
-                color: root.result ? root.accent : (root.statusIsError ? root.urgent : root.foreground)
-                opacity: root.result || root.statusIsError ? 1 : 0.5
-                font.family: root.fontFamily
-                font.pixelSize: root.rateSummary ? Style.font.title
-                  : (root.visibleStatus.length > 32 ? Style.font.title : Style.font.heading)
-                font.weight: root.result ? Font.DemiBold : Font.Normal
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideLeft
-              }
+            Text {
+              id: rateMetadata
+              visible: root.rateSummary.length > 0
+              width: visible ? Math.min(implicitWidth, Style.space(220)) : 0
+              anchors.right: copyResultHint.left
+              anchors.rightMargin: visible ? Style.spacing.md : 0
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.rateSummary
+              color: root.rateStale ? root.urgent : root.foreground
+              opacity: root.rateStale ? 0.9 : 0.5
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              horizontalAlignment: Text.AlignRight
+              elide: Text.ElideLeft
+            }
 
-              Text {
-                width: outputColumn.width
-                visible: root.rateSummary.length > 0
-                text: root.rateSummary
-                color: root.rateStale ? root.urgent : root.foreground
-                opacity: root.rateStale ? 0.9 : 0.46
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                horizontalAlignment: Text.AlignRight
-                elide: Text.ElideLeft
-              }
+            Text {
+              id: resultValue
+              anchors.left: resultColorSwatch.visible ? resultColorSwatch.right : parent.left
+              anchors.leftMargin: resultColorSwatch.visible ? Style.spacing.md : 0
+              anchors.right: rateMetadata.visible ? rateMetadata.left : copyResultHint.left
+              anchors.rightMargin: Style.spacing.md
+              anchors.verticalCenter: parent.verticalCenter
+              text: root.displayResult
+              color: root.accent
+              font.family: root.fontFamily
+              font.pixelSize: root.displayResult.length > 42
+                ? Math.round(Style.font.heading * 1.15)
+                : Math.round(Style.font.heading * 1.5)
+              font.weight: Font.Bold
+              horizontalAlignment: Text.AlignLeft
+              elide: Text.ElideRight
             }
 
             MouseArea {
               anchors.fill: parent
-              enabled: root.result.length > 0 || (!root.backendAvailable && root.backendChecked)
-              cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-              onClicked: {
-                if (root.result) root.submit("copy-close")
-                else root.requestDependencyInstall()
-              }
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.submit("copy-close")
             }
           }
         }
@@ -1746,7 +1796,7 @@ Item {
           id: historyPane
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.top: inputRow.bottom
+          anchors.top: resultRow.bottom
           anchors.topMargin: Style.space(12)
           anchors.bottom: parent.bottom
           visible: root.historyOpen && !root.setupOpen
@@ -1906,7 +1956,7 @@ Item {
           id: detailPane
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.top: inputRow.bottom
+          anchors.top: resultRow.bottom
           anchors.topMargin: Style.space(12)
           anchors.bottom: parent.bottom
           visible: root.detailOpen && !root.setupOpen
@@ -1964,7 +2014,7 @@ Item {
           id: actionPane
           anchors.left: parent.left
           anchors.right: parent.right
-          anchors.top: inputRow.bottom
+          anchors.top: resultRow.bottom
           anchors.topMargin: Style.space(12)
           anchors.bottom: parent.bottom
           visible: root.actionMenuOpen && !root.setupOpen
