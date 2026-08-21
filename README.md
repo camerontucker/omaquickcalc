@@ -43,14 +43,14 @@ keyboard-first expression and conversion palette inside `omarchy-shell`.
   </tr>
   <tr>
     <td width="50%">
-      <img src="assets/timezone-conversion.png" alt="5 PM London converted to 1 AM the next day in Tokyo in OmaQuickCalc"><br>
-      <strong>Carry time across midnight: 01:00 Saturday</strong><br>
-      <code>5pm London in Tokyo</code> keeps the destination date and timezone.
+      <img src="assets/currency-conversion.png" alt="100 Canadian dollars converted to 72.60535265 US dollars with the current rate date in OmaQuickCalc"><br>
+      <strong>Convert currency with rate context: $72.60535265</strong><br>
+      <code>100 CAD in USD</code> shows the rate source and date beside the result.
     </td>
     <td width="50%">
-      <img src="assets/color-actions.png" alt="HSL orange converted to hex FF8800 with color copy actions in OmaQuickCalc"><br>
-      <strong>See the color, then copy the format you need</strong><br>
-      <code>hsl(32, 100%, 50%)</code> becomes <code>#FF8800</code>, with HEX, RGB, and HSL actions.
+      <img src="assets/calculation-history.png" alt="1000 plus 123 equals 1123 with searchable calculation history open in OmaQuickCalc"><br>
+      <strong>Keep the answer, recall the work</strong><br>
+      <code>1000 + 123</code> returns <code>1123</code>; Up opens earlier calculations for reuse.
     </td>
   </tr>
 </table>
