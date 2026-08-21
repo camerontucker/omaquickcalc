@@ -56,7 +56,8 @@ class ShortcutTests(unittest.TestCase):
             original = "-- untouched\n"
             path.write_text(original, encoding="utf-8")
             with patch("omaquickcalc_setup.hyprland_reload", return_value=(False, "bad config")):
-                result = setup.apply_shortcut(path, "SUPER + ALT + Q", PLUGIN_ID)
+                with patch("omaquickcalc_setup.subprocess.run"):
+                    result = setup.apply_shortcut(path, "SUPER + ALT + Q", PLUGIN_ID)
             self.assertFalse(result["ok"])
             self.assertEqual(path.read_text(encoding="utf-8"), original)
 
