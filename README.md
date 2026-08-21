@@ -141,4 +141,4 @@ Release history lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-[MIT](LICENSE) © 2026 OmaQuickCalc contributors.
+[MIT](LICENSE)
