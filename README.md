@@ -17,102 +17,46 @@
   <a href="SECURITY.md"><strong>Security</strong></a>
 </p>
 
-OmaQuickCalc turns a calculation into one short keyboard flow: launch, type,
-press Enter, paste the result. Select a value before using your configured
-shortcut and it becomes an operand you can transform and replace in place.
-There is no mode switch—the expression decides whether you are doing
-arithmetic, converting currency, comparing timezones, or translating a color.
-
-It complements the official [Omacalc](https://github.com/omacom-io/omacalc).
-Omacalc is a traditional standalone calculator with a keypad; OmaQuickCalc is a
-keyboard-first expression and conversion palette inside `omarchy-shell`.
+OmaQuickCalc is a fast expression and conversion palette for Omarchy. Launch it
+for an instant answer, or select a value and transform it directly in the app
+where you are working.
 
 ## Transform in Place
 
-Highlight `100 CAD` in any application, summon OmaQuickCalc with its configured
-shortcut, and type `in USD`. The selected operand remains visible beside the
-query and the live result is `$72.61`.
+Highlight `100 CAD`, summon OmaQuickCalc, and type `in USD`. Press `Enter` to
+copy `$72.61`, or `Shift+Enter` to replace the original selection.
 
-- Press `Enter` to copy the answer normally.
-- Press `Shift+Enter` to close the palette and replace the original selection.
+**1. Select the value**
 
-The same flow handles `125` → `20% off`, `64px` → `in rem`,
-`5 ft 11 in` → `in cm`, and a complete selection such as `1pm pacific`.
-Normal launcher opens never read selected or clipboard text. Selection capture
-happens only after invoking a shortcut the user explicitly approved during
-setup, accepts only short text containing a number, and never writes transform
-sessions to calculation history.
+![100 CAD selected in an Omawrite client invoice](assets/transform-selected.png)
 
-<table>
-  <tr>
-    <td width="50%">
-      <img src="assets/transform-selected.png" alt="100 CAD selected in an Omawrite client invoice"><br>
-      <strong>1. Select the value</strong><br>
-      The surrounding document stays exactly where you were working.
-    </td>
-    <td width="50%">
-      <img src="assets/transform-replaced.png" alt="The selected invoice value replaced with 72.61 dollars in Omawrite"><br>
-      <strong>2. Shift+Enter puts the answer back</strong><br>
-      Only the originating selection becomes <code>$72.61</code>.
-    </td>
-  </tr>
-</table>
+**2. Transform it and put the answer back**
 
-## Try asking
+![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/transform-replaced.png)
 
-<table>
-  <tr>
-    <td width="50%">
-      <img src="assets/discount-math.png" alt="64 pixels converted to 4 rem in OmaQuickCalc"><br>
-      <strong>Translate design units: 4 rem</strong><br>
-      <code>64px in rem</code> uses your configurable REM pixel base.
-    </td>
-    <td width="50%">
-      <img src="assets/unit-conversion.png" alt="5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc"><br>
-      <strong>Convert mixed units: 180.34 cm</strong><br>
-      <code>5 ft 11 in to cm</code> understands the whole measurement.
-    </td>
-  </tr>
-  <tr>
-    <td width="50%">
-      <img src="assets/currency-conversion.png" alt="100 Canadian dollars converted to 72.61 US dollars with the current rate date in OmaQuickCalc"><br>
-      <strong>Convert currency with rate context: $72.61</strong><br>
-      <code>100 CAD in USD</code> shows the rate source and date beside the result.
-    </td>
-    <td width="50%">
-      <img src="assets/calculation-history.png" alt="1000 plus 123 equals 1123 with searchable calculation history open in OmaQuickCalc"><br>
-      <strong>Keep the answer, recall the work</strong><br>
-      <code>1000 + 123</code> returns <code>1123</code>; Up opens earlier calculations for reuse.
-    </td>
-  </tr>
-</table>
+Selection capture runs only from a shortcut you explicitly approve. Normal
+launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
 
-Also try `square root of 625`, `$2.5m in cad`,
-`March 4, 2030 + 45 days`, `90 mins to timespan`, `18% tip on 80`, or
-`16 h in workdays`. Type `1pm pacific`, `1pm vancouver`, or `1pm pdt` to
-convert directly to your current local timezone.
+## Examples
 
-The card stays compact while empty, then expands to give a valid answer its own
-high-contrast result row. Press Enter or click the result to copy the answer and
-close; use `Ctrl+Enter` to copy without leaving the palette.
+**Design units — `64px in rem` → `4 rem`**
 
-## Why it feels at home in Omarchy
+![64 pixels converted to 4 rem in OmaQuickCalc](assets/discount-math.png)
 
-- **Transform in place.** Turn a selected value into a result and send it
-  straight back to the originating application without a copy/paste loop.
-- **Fast by default.** Live evaluation, result chaining, searchable history,
-  and contextual actions stay inside one focused overlay.
-- **More than arithmetic.** Qalculate powers units, constants, functions, and
-  currencies; OmaQuickCalc adds natural phrases, dates, timezones, workdays,
-  REM/PX, timespans, and color formats.
-- **Built for the keyboard.** Copy the answer, copy the full equation, swap a
-  conversion, pin history, refresh rates, or select fractions, bases, and
-  scientific notation without reaching for another app.
-- **Actually themed.** The palette follows the active Omarchy colors,
-  typography, borders, spacing, and your chosen background transparency.
-- **Careful with your desktop.** The launcher works after a normal marketplace
-  install. Shortcut changes are optional, shown before writing, limited to one
-  marked block, validated with Hyprland, and rolled back if rejected.
+**Mixed units — `5 ft 11 in to cm` → `180.34 cm`**
+
+![5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc](assets/unit-conversion.png)
+
+**Currency — `100 CAD in USD` → `$72.61` with rate context**
+
+![100 Canadian dollars converted to 72.61 US dollars with the current rate date](assets/currency-conversion.png)
+
+**Math and history — `1000 + 123` → `1123`**
+
+![1000 plus 123 equals 1123 with calculation history open](assets/calculation-history.png)
+
+Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
+`1pm pacific` to convert directly to your local time.
 
 ## Install
 
@@ -123,107 +67,35 @@ plugin command:
 omarchy plugin add https://github.com/camerontucker/omaquickcalc.git --enable
 ```
 
-Normal marketplace installation does not execute `install.sh`, and
-OmaQuickCalc does not depend on it. Once enabled, the overlay creates its owned
-launcher entry on load. On first use it checks its three runtime dependencies:
-
-- `python` runs the bundled evaluator and safe launch and transform helpers.
-- `libqalculate` provides `qalc`, the local calculation engine.
-- `wl-clipboard` provides `wl-copy` for results and `wl-paste` for explicit
-  selection capture.
-
-If one is missing, pressing Enter on the dependency prompt opens Omarchy's
-package command in a visible terminal for normal authentication. Nothing is
-installed in the background. To install them yourself:
+The plugin checks for `python`, `libqalculate`, and `wl-clipboard`, then offers
+to install anything missing in a visible terminal. To install them yourself:
 
 ```bash
 omarchy pkg add python libqalculate wl-clipboard
 ```
 
-Omarchy plugins run as unsandboxed user code. Review the source and
+Launch from `Super + Space`. On first use, choose whether to replace Omacalc's
+shortcut, set another, or skip. Nothing changes without confirmation.
+
+Omarchy plugins run as unsandboxed user code. Review the
 [security notes](SECURITY.md) before enabling any community plugin.
-
-## Launch and first run
-
-Open the app launcher with `Super + Space`, search for **OmaQuickCalc**, and
-press Enter. The first-run screen offers three choices:
-
-1. Replace Omacalc's `Super + Ctrl + Q` binding.
-2. Choose another shortcut after OmaQuickCalc checks for conflicts.
-3. Skip shortcut setup and keep launching from `Super + Space`.
-
-![OmaQuickCalc first-run shortcut choices](assets/launch-setup.png)
-
-No shortcut is changed until you see the exact effect and confirm it. Replacing
-the binding does not uninstall Omacalc; it remains available from the launcher.
-The approved shortcut also enables explicit selection capture for Transform in
-Place; ordinary Super + Space launcher opens remain clipboard-blind.
-Right-click OmaQuickCalc in a desktop-entry-aware launcher and select
-**Configure launch shortcut** to revisit this screen.
-
-You can also summon the palette directly, optionally with an expression:
-
-```bash
-omarchy-shell shell summon io.github.camerontucker.omaquickcalc '{}'
-omarchy-shell shell summon io.github.camerontucker.omaquickcalc \
-  '{"expression":"12 ft to m"}'
-```
-
-## Keyboard
-
-| Key | Action |
-| --- | --- |
-| `Enter` | Run the configured default action: copy result and close initially |
-| `Ctrl+Enter` | Copy the result and keep the palette open |
-| `Shift+Enter` | Replace the originating selection during Transform in Place; otherwise copy `expression = result` |
-| `Tab` | Replace the expression with its result for chaining |
-| `Alt+Enter` | Expand or collapse the full result or error |
-| `Ctrl+K` | Open contextual result and format actions |
-| `Up` or `Ctrl+H` | Open searchable calculation history |
-| `Up` / `Down` | Move through history or actions |
-| `Enter` in history | Recall the selected expression |
-| `Ctrl+P` in history | Pin or unpin the selected entry |
-| `Delete` in history | Remove the selected entry |
-| `Ctrl+Shift+Delete` | Confirm and clear all history |
-| `Escape` | Close a panel, clear the input, then close the palette |
-
-Enter, `Ctrl+Enter`, and clicking the displayed result copy the evaluated
-**result**. Shift+Enter replaces an explicitly captured selection; during a
-normal launch it remains the separate equation-copy action.
 
 ## Configuration
 
-OmaQuickCalc creates `~/.config/omaquickcalc/config.json`. Settings include
-history privacy and retention, the default Enter action, decimal precision,
-currency defaults, 12/24-hour clocks, rate freshness, REM and workday bases,
-and `backgroundOpacity` from fully transparent (`0`) to opaque (`1`).
-
-See the [configuration reference](docs/CONFIGURATION.md) for every field,
-accepted value, and data location.
+Set history, precision, currencies, clock format, rate freshness, REM and
+workday bases, and background transparency in
+`~/.config/omaquickcalc/config.json`. See the
+[configuration reference](docs/CONFIGURATION.md).
 
 ## Privacy and security
 
-Calculations happen locally through the bundled Python evaluator and `qalc`.
-OmaQuickCalc has no account, telemetry, advertising, or API key. Expressions
-are passed as process arguments rather than interpolated into shell commands,
-and copied results are passed literally after `wl-copy --`.
+Calculations are local, with no account, telemetry, ads, or API key. Qalculate
+may access the network only to refresh exchange rates. History can be
+persistent, session-only, or disabled.
 
-Transform in Place is initiated only by the optional shortcut that the user
-approved. Its numeric selection is held in a private, single-use file beneath
-`$XDG_RUNTIME_DIR`, consumed immediately by the overlay, and excluded from
-history. The previous clipboard is restored after capture. Replacement occurs
-only if focus returns to the exact window where capture began.
-
-History can be persistent, session-only, or disabled. Persistent history stays
-in `~/.local/share/omaquickcalc/history.json`; pinned entries survive normal
-retention pruning. Qalculate may access the network to refresh exchange-rate
-data when currency refresh is enabled. The optional package-install action also
-uses Omarchy's normal networked package workflow after confirmation.
-
-The launcher and optional binding are the only desktop integrations the plugin
-manages. It refuses to overwrite an unmarked desktop entry or unrelated
-Hyprland configuration. See [SECURITY.md](SECURITY.md) for the complete system
-interaction disclosure.
+Transform selections are private, single-use, excluded from history, and
+replaced only in the originating window. The plugin never overwrites unmarked
+desktop or Hyprland configuration. Read the full [security model](SECURITY.md).
 
 ## Update
 
@@ -231,33 +103,26 @@ interaction disclosure.
 omarchy plugin update io.github.camerontucker.omaquickcalc
 ```
 
-Omarchy shows the incoming update for review. The launcher entry refreshes when
-the updated plugin loads; `install.sh` is not needed. The Transform in Place
-upgrade reopens shortcut setup once so existing users can explicitly approve
-selection capture or keep a clipboard-blind launcher-only workflow.
+Omarchy shows the incoming update for review before applying it.
 
 ## Remove
 
-Use the bundled removal script so the optional managed shortcut and owned
-launcher entry are removed before the plugin:
+Use the bundled removal script to remove the managed shortcut and launcher:
 
 ```bash
 ~/.config/omarchy/plugins/io.github.camerontucker.omaquickcalc/uninstall.sh --yes
 ```
 
-The cleanup removes only OmaQuickCalc's marked launch integrations and refuses
-to delete an unmarked desktop entry. Preferences and history are retained. To
-erase those after removal as well:
+Preferences and history are retained. To erase those too:
 
 ```bash
 rm -rf ~/.config/omaquickcalc ~/.local/share/omaquickcalc
 ```
 
-## Development
+<details>
+<summary>Development</summary>
 
-From a source checkout, `./install.sh` installs dependencies through Omarchy,
-links the checkout into the plugin directory, rescans the shell, and enables the
-plugin. Before a release:
+From a source checkout, run `./install.sh`. Before a release:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
@@ -269,6 +134,8 @@ git diff --check
 
 Architecture and contributor invariants live in [AGENTS.md](AGENTS.md).
 Release history lives in [CHANGELOG.md](CHANGELOG.md).
+
+</details>
 
 ## License
 
