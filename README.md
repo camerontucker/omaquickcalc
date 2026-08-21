@@ -8,8 +8,6 @@
 ![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/camerontucker/omaquickcalc/main/assets/omaquickcalc-demo.gif"><strong>Watch the demo</strong></a>
-  ·
   <a href="#install"><strong>Install</strong></a>
   ·
   <a href="docs/CONFIGURATION.md"><strong>Configure</strong></a>
@@ -21,6 +19,8 @@ OmaQuickCalc is the calculator you summon, not switch to. Type math or
 plain-language conversions into a focused floating palette and get a live,
 copy-ready answer. When the result belongs in the app you came from, Transform
 in Place can put it there.
+
+[![Play the OmaQuickCalc demo](assets/omaquickcalc-demo-poster.png)](https://raw.githubusercontent.com/camerontucker/omaquickcalc/main/assets/omaquickcalc-demo.gif)
 
 ## Examples
 
