@@ -24,19 +24,19 @@ in Place can put it there.
 
 ## Examples
 
-**Design units — `64px in rem` → `4 rem`**
+**Design units**
 
 ![64 pixels converted to 4 rem in OmaQuickCalc](assets/readme-discount-math.png)
 
-**Mixed units — `5 ft 11 in to cm` → `180.34 cm`**
+**Mixed units**
 
 ![5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc](assets/readme-unit-conversion.png)
 
-**Currency — `100 CAD in USD` → `$72.61` with rate context**
+**Currency conversion**
 
 ![100 Canadian dollars converted to 72.61 US dollars with the current rate date](assets/readme-currency-conversion.png)
 
-**Math and history — `1000 + 123` → `1123`**
+**Calculation history**
 
 ![1000 plus 123 equals 1123 with calculation history open](assets/readme-calculation-history.png)
 
