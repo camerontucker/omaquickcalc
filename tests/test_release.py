@@ -70,6 +70,13 @@ class ReleaseContractTests(unittest.TestCase):
     def test_readme_local_links_resolve(self):
         readme = (REPOSITORY / "README.md").read_text(encoding="utf-8")
         targets = re.findall(r"!?\[[^]]*\]\(([^)]+)\)", readme)
+        targets.extend(
+            re.findall(
+                r'<(?:a|img)\b[^>]*\b(?:href|src)="([^"]+)"',
+                readme,
+                re.IGNORECASE,
+            )
+        )
         local_targets = [
             target.split("#", 1)[0]
             for target in targets

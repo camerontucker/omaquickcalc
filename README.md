@@ -28,16 +28,36 @@ keyboard-first expression and conversion palette inside `omarchy-shell`.
 
 ## Try asking
 
-| Need | Type |
-| --- | --- |
-| Everyday math | `240 * 15%` or `square root of 625` |
-| Discounts and tips | `20% off 125` or `18% tip on 80` |
-| Units | `10ft in m` |
-| Currency | `$2.5m in cad` or `500 quid to eur` |
-| Timezones | `5pm ldn in sf` or `time in Tokyo` |
-| Dates and durations | `March 4, 2030 + 45 days` or `90 mins to timespan` |
-| Design values | `64px in rem` or `16 h in workdays` |
-| Colors | `hsl(32, 100%, 50%)` |
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/discount-math.png" alt="64 pixels converted to 4 rem in OmaQuickCalc"><br>
+      <strong>Translate design units: 4 rem</strong><br>
+      <code>64px in rem</code> uses your configurable REM pixel base.
+    </td>
+    <td width="50%">
+      <img src="assets/unit-conversion.png" alt="5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc"><br>
+      <strong>Convert mixed units: 180.34 cm</strong><br>
+      <code>5 ft 11 in to cm</code> understands the whole measurement.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="assets/timezone-conversion.png" alt="5 PM London converted to 1 AM the next day in Tokyo in OmaQuickCalc"><br>
+      <strong>Carry time across midnight: 01:00 Saturday</strong><br>
+      <code>5pm London in Tokyo</code> keeps the destination date and timezone.
+    </td>
+    <td width="50%">
+      <img src="assets/color-actions.png" alt="HSL orange converted to hex FF8800 with color copy actions in OmaQuickCalc"><br>
+      <strong>See the color, then copy the format you need</strong><br>
+      <code>hsl(32, 100%, 50%)</code> becomes <code>#FF8800</code>, with HEX, RGB, and HSL actions.
+    </td>
+  </tr>
+</table>
+
+Also try `square root of 625`, `$2.5m in cad`,
+`March 4, 2030 + 45 days`, `90 mins to timespan`, `18% tip on 80`, or
+`16 h in workdays`.
 
 The result updates while you type. Press Enter or click the result to copy the
 answer and close; use `Ctrl+Enter` to copy without leaving the palette.
