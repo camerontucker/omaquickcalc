@@ -52,7 +52,11 @@ copy `$72.61`, or `Shift+Enter` to replace the original selection.
 
 ![100 CAD selected in an Omawrite client invoice](assets/readme-transform-selected.png)
 
-**2. Transform it and put the answer back**
+**2. Type `in USD`**
+
+![OmaQuickCalc converting the selected 100 CAD to 72.61 USD](assets/readme-transform-converted.png)
+
+**3. Put the answer back**
 
 ![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/readme-transform-replaced.png)
 
