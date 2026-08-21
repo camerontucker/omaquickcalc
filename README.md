@@ -5,7 +5,7 @@
   A Raycast-style quick calculator built for Omarchy Quattro.
 </p>
 
-![OmaQuickCalc converting a selected 100 CAD invoice value to 72.61 USD](preview.png)
+![OmaQuickCalc converting a selected 100 CAD invoice value to 72.61 USD](assets/readme-hero.png)
 
 <p align="center">
   <a href="assets/omaquickcalc-demo.mp4"><strong>Watch Transform in Place</strong></a>
