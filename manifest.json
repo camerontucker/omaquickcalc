@@ -4,7 +4,7 @@
   "name": "OmaQuickCalc",
   "version": "0.5.0",
   "author": "Cam Tucker",
-  "description": "A Raycast-style calculator that transforms selected values in place with live math, currencies, units, dates, and timezones",
+  "description": "A fast modal calculator for Omarchy with live math, currencies, units, dates, timezones, history, and Transform in Place",
   "kinds": [
     "overlay"
   ],

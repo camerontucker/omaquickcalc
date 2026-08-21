@@ -12,7 +12,7 @@
 - Add safe launcher upgrades and managed integration removal.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
-- Expand Raycast-style calculations, history, actions, formats, transparency,
+- Expand natural-language calculations, history, actions, formats, transparency,
   dependency recovery, and copy-result behavior.
 - Promote valid answers to an expanding, left-aligned result row with stronger
   typography, full-width conversion space, metadata, and a visible copy hint.

@@ -18,7 +18,7 @@ keyboard-first, single-floating-input experience and keep changes scoped.
   actions.
 - `OmaQuickCalcModel.js` contains QML-compatible settings and history helpers.
   Keep it free of Node-only APIs.
-- `omaquickcalc_backend.py` normalizes Raycast-style phrases and returns
+- `omaquickcalc_backend.py` normalizes natural-language calculator phrases and returns
   structured results from Qalculate.
 - `omaquickcalc_setup.py` owns the optional, consent-based Hyprland binding and
   reversible launcher lifecycle operations.

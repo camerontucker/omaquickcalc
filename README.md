@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Calculate anything without leaving your flow.</strong><br>
-  A Raycast-inspired modal calculator for Omarchy Quattro, with Transform in Place.
+  A fast modal calculator for Omarchy Quattro, with Transform in Place.
 </p>
 
 ![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
@@ -18,7 +18,7 @@
 </p>
 
 OmaQuickCalc is the calculator you summon, not switch to. Type math or
-plain-language conversions into a Raycast-inspired palette and get a live,
+plain-language conversions into a focused floating palette and get a live,
 copy-ready answer. When the result belongs in the app you came from, Transform
 in Place can put it there.
 
