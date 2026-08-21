@@ -15,7 +15,7 @@ import sys
 import unicodedata
 from calendar import monthrange
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from fractions import Fraction
 from pathlib import Path
@@ -57,6 +57,9 @@ ZONE_ALIASES = {
     "chicago": "America/Chicago",
     "denver": "America/Denver",
     "vancouver": "America/Vancouver",
+    "pacific": "America/Vancouver",
+    "pacific time": "America/Vancouver",
+    "pt": "America/Vancouver",
     "toronto": "America/Toronto",
     "sao paulo": "America/Sao_Paulo",
     "são paulo": "America/Sao_Paulo",
@@ -67,6 +70,11 @@ ZONE_ALIASES = {
     "dubai": "Asia/Dubai",
     "utc": "UTC",
     "gmt": "UTC",
+}
+
+FIXED_ZONE_ALIASES = {
+    "pdt": timezone(timedelta(hours=-7), "PDT"),
+    "pst": timezone(timedelta(hours=-8), "PST"),
 }
 
 WEEKDAYS = {
@@ -134,8 +142,17 @@ def clean_name(value: str) -> str:
     return " ".join("".join(c for c in normalized if not unicodedata.combining(c)).replace("_", " ").split())
 
 
-def resolve_zone(value: str) -> ZoneInfo | None:
+def local_zone() -> tzinfo:
+    return datetime.now().astimezone().tzinfo
+
+
+def resolve_zone(value: str) -> tzinfo | None:
     key = clean_name(value)
+    if key in {"local", "local time", "here"}:
+        return local_zone()
+    fixed = FIXED_ZONE_ALIASES.get(key)
+    if fixed:
+        return fixed
     direct = ZONE_ALIASES.get(key)
     if direct:
         return ZoneInfo(direct)
@@ -171,6 +188,15 @@ def format_clock(value: datetime, clock_format: str) -> str:
 
 def format_datetime(value: datetime, clock_format: str = "auto") -> str:
     return f"{format_clock(value, clock_format)} · {value.strftime('%a, %b %-d')} · {value.strftime('%Z')}"
+
+
+def format_timezone_conversion(source: datetime, target: datetime,
+                               clock_format: str = "auto") -> str:
+    parts = [format_clock(target, clock_format)]
+    if source.date() != target.date():
+        parts.append(target.strftime("%a, %b %-d"))
+    parts.append(target.strftime("%Z"))
+    return " · ".join(parts)
 
 
 def parse_clock(value: str) -> time | None:
@@ -226,7 +252,19 @@ def timezone_evaluation(expression: str, clock_format: str = "auto") -> Evaluati
             return Evaluation(False, error="Use a known source and destination timezone", kind="timezone")
         source_value = datetime.combine(datetime.now(source).date(), clock, source)
         value = source_value.astimezone(target)
-        return Evaluation(True, format_datetime(value, clock_format), value.strftime("%H:%M"), kind="timezone", dynamic=True)
+        return Evaluation(True, format_timezone_conversion(source_value, value, clock_format),
+                          value.strftime("%H:%M"), kind="timezone", dynamic=True)
+
+    match = re.fullmatch(r"(\d{1,2}(?::\d{2})?\s*(?:am|pm)|\d{1,2}:\d{2})\s+(.+)", text, re.I)
+    if match:
+        clock = parse_clock(match.group(1))
+        source = resolve_zone(match.group(2))
+        if clock is not None and source is not None:
+            target = local_zone()
+            source_value = datetime.combine(datetime.now(source).date(), clock, source)
+            value = source_value.astimezone(target)
+            return Evaluation(True, format_timezone_conversion(source_value, value, clock_format),
+                              value.strftime("%H:%M"), kind="timezone", dynamic=True)
 
     return None
 

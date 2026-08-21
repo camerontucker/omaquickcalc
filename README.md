@@ -57,7 +57,8 @@ keyboard-first expression and conversion palette inside `omarchy-shell`.
 
 Also try `square root of 625`, `$2.5m in cad`,
 `March 4, 2030 + 45 days`, `90 mins to timespan`, `18% tip on 80`, or
-`16 h in workdays`.
+`16 h in workdays`. Type `1pm pacific`, `1pm vancouver`, or `1pm pdt` to
+convert directly to your current local timezone.
 
 The card stays compact while empty, then expands to give a valid answer its own
 high-contrast result row. Press Enter or click the result to copy the answer and

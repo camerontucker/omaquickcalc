@@ -96,6 +96,30 @@ class StructuredEvaluatorTests(unittest.TestCase):
         self.assertEqual(backend.format_clock(value, "12"), "5:05 PM")
         self.assertEqual(backend.format_clock(value, "24"), "17:05")
 
+    def test_timezone_shorthand_converts_to_local_time(self):
+        target = backend.ZoneInfo("America/Winnipeg")
+        with patch("omaquickcalc_backend.local_zone", return_value=target):
+            for phrase in ("1pm pacific", "1pm vancouver", "1pm pdt", "1pm pt", "1pm pst"):
+                with self.subTest(phrase=phrase):
+                    result = backend.evaluate(phrase, clock_format="12")
+                    self.assertTrue(result.ok)
+                    self.assertEqual(result.kind, "timezone")
+                    source = backend.resolve_zone(phrase.split(maxsplit=1)[1])
+                    source_value = backend.datetime.combine(
+                        backend.datetime.now(source).date(), backend.time(13), source)
+                    expected = backend.format_timezone_conversion(
+                        source_value, source_value.astimezone(target), "12")
+                    self.assertEqual(result.result, expected)
+        self.assertEqual(backend.resolve_zone("pdt").utcoffset(None), backend.timedelta(hours=-7))
+        self.assertEqual(backend.resolve_zone("pst").utcoffset(None), backend.timedelta(hours=-8))
+
+    def test_timezone_conversion_only_includes_date_across_day_boundary(self):
+        same_day = backend.evaluate("1pm Vancouver in Winnipeg", clock_format="12")
+        self.assertRegex(same_day.result, r"^3:00 PM · C[DS]T$")
+
+        next_day = backend.evaluate("5pm London in Tokyo", clock_format="12")
+        self.assertRegex(next_day.result, r"^[12]:00 AM · .+ · JST$")
+
     def test_rate_metadata_reports_freshness(self):
         with patch.dict("omaquickcalc_backend.os.environ", {
             "OMAQUICKCALC_QALCULATE_DATA_DIR": "tests/fixtures"

@@ -18,6 +18,8 @@
   typography, full-width conversion space, metadata, and a visible copy hint.
 - Round displayed and normally copied currency answers to two decimal places
   while retaining full precision for swap and unformatted actions.
+- Convert shorthand times such as `1pm pacific`, `1pm vancouver`, and `1pm pdt`
+  to the current local timezone, showing a date only when the day changes.
 - Keep incomplete and out-of-range live expressions from crashing the bundled
   evaluator while the user types.
 - Add automated release-contract, lifecycle, evaluator, shell, Python, and QML
