@@ -1,14 +1,14 @@
 # OmaQuickCalc
 
 <p align="center">
-  <strong>Select it. Transform it. Put it straight back.</strong><br>
-  A Raycast-style quick calculator built for Omarchy Quattro.
+  <strong>Calculate anything without leaving your flow.</strong><br>
+  A Raycast-inspired modal calculator for Omarchy Quattro, with Transform in Place.
 </p>
 
 ![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
 
 <p align="center">
-  <a href="assets/omaquickcalc-demo.mp4"><strong>Watch Transform in Place</strong></a>
+  <a href="assets/omaquickcalc-demo.mp4"><strong>Watch the demo</strong></a>
   ·
   <a href="#install"><strong>Install</strong></a>
   ·
@@ -17,25 +17,10 @@
   <a href="SECURITY.md"><strong>Security</strong></a>
 </p>
 
-OmaQuickCalc is a fast expression and conversion palette for Omarchy. Launch it
-for an instant answer, or select a value and transform it directly in the app
-where you are working.
-
-## Transform in Place
-
-Highlight `100 CAD`, summon OmaQuickCalc, and type `in USD`. Press `Enter` to
-copy `$72.61`, or `Shift+Enter` to replace the original selection.
-
-**1. Select the value**
-
-![100 CAD selected in an Omawrite client invoice](assets/readme-transform-selected.png)
-
-**2. Transform it and put the answer back**
-
-![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/readme-transform-replaced.png)
-
-Selection capture runs only from a shortcut you explicitly approve. Normal
-launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
+OmaQuickCalc brings live math, conversions, currencies, timezones, and history
+to one fast floating input. Summon it, type naturally, and press Enter to copy
+the result. When useful, Transform in Place can send an answer directly back
+to selected text in another app.
 
 ## Examples
 
@@ -57,6 +42,22 @@ launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
 
 Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
 `1pm pacific` to convert directly to your local time.
+
+## Transform in Place
+
+Highlight `100 CAD`, summon OmaQuickCalc, and type `in USD`. Press `Enter` to
+copy `$72.61`, or `Shift+Enter` to replace the original selection.
+
+**1. Select the value**
+
+![100 CAD selected in an Omawrite client invoice](assets/readme-transform-selected.png)
+
+**2. Transform it and put the answer back**
+
+![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/readme-transform-replaced.png)
+
+Selection capture runs only from a shortcut you explicitly approve. Normal
+launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
 
 ## Install
 
