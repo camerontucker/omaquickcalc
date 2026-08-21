@@ -5,7 +5,7 @@
   A Raycast-style quick calculator built for Omarchy Quattro.
 </p>
 
-![OmaQuickCalc converting a selected 100 CAD invoice value to 72.61 USD](assets/readme-hero.png)
+![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
 
 <p align="center">
   <a href="assets/omaquickcalc-demo.mp4"><strong>Watch Transform in Place</strong></a>
@@ -28,11 +28,11 @@ copy `$72.61`, or `Shift+Enter` to replace the original selection.
 
 **1. Select the value**
 
-![100 CAD selected in an Omawrite client invoice](assets/transform-selected.png)
+![100 CAD selected in an Omawrite client invoice](assets/readme-transform-selected.png)
 
 **2. Transform it and put the answer back**
 
-![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/transform-replaced.png)
+![The selected invoice value replaced with 72.61 dollars in Omawrite](assets/readme-transform-replaced.png)
 
 Selection capture runs only from a shortcut you explicitly approve. Normal
 launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
@@ -41,19 +41,19 @@ launcher opens remain clipboard-blind. See [Security](SECURITY.md) for details.
 
 **Design units — `64px in rem` → `4 rem`**
 
-![64 pixels converted to 4 rem in OmaQuickCalc](assets/discount-math.png)
+![64 pixels converted to 4 rem in OmaQuickCalc](assets/readme-discount-math.png)
 
 **Mixed units — `5 ft 11 in to cm` → `180.34 cm`**
 
-![5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc](assets/unit-conversion.png)
+![5 feet 11 inches converted to 180.34 centimetres in OmaQuickCalc](assets/readme-unit-conversion.png)
 
 **Currency — `100 CAD in USD` → `$72.61` with rate context**
 
-![100 Canadian dollars converted to 72.61 US dollars with the current rate date](assets/currency-conversion.png)
+![100 Canadian dollars converted to 72.61 US dollars with the current rate date](assets/readme-currency-conversion.png)
 
 **Math and history — `1000 + 123` → `1123`**
 
-![1000 plus 123 equals 1123 with calculation history open](assets/calculation-history.png)
+![1000 plus 123 equals 1123 with calculation history open](assets/readme-calculation-history.png)
 
 Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
 `1pm pacific` to convert directly to your local time.
