@@ -8,7 +8,7 @@
 ![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
 
 <p align="center">
-  <a href="assets/omaquickcalc-demo.mp4"><strong>Watch the demo</strong></a>
+  <a href="https://raw.githubusercontent.com/camerontucker/omaquickcalc/main/assets/omaquickcalc-demo.gif"><strong>Watch the demo</strong></a>
   ·
   <a href="#install"><strong>Install</strong></a>
   ·
