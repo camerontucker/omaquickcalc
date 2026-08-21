@@ -54,8 +54,16 @@ class NaturalLanguageTests(unittest.TestCase):
         result = backend.evaluate("100 usd in gbp")
         self.assertEqual(result.kind, "currency")
         self.assertTrue(result.dynamic)
+        self.assertEqual(result.result, "£74.95")
         self.assertEqual(result.rawResult, "74.9475")
         self.assertEqual(result.swapExpression, "74.9475 GBP to USD")
+
+    @patch("omaquickcalc_backend.subprocess.run")
+    def test_currency_rounds_half_up_and_preserves_grouping(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, "$1,234.565\n", "")
+        result = backend.evaluate("1700 cad in usd")
+        self.assertEqual(result.result, "$1,234.57")
+        self.assertEqual(result.rawResult, "1234.565")
 
 
 class StructuredEvaluatorTests(unittest.TestCase):

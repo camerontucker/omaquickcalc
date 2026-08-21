@@ -16,7 +16,7 @@ import unicodedata
 from calendar import monthrange
 from dataclasses import asdict, dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from fractions import Fraction
 from pathlib import Path
 from zoneinfo import ZoneInfo, available_timezones
@@ -640,6 +640,25 @@ def plain_result(value: str, kind: str) -> str:
     return result
 
 
+def currency_result(value: str, raw: str) -> str:
+    """Round the primary money result while retaining raw calculator precision."""
+    match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?(?:[Ee][-+]?\d+)?", value)
+    if not match:
+        return value
+    try:
+        amount = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return value
+
+    prefix = value[:match.start()]
+    suffix = value[match.end():]
+    sign_outside_number = amount < 0 and ("-" in prefix or "−" in prefix
+                                          or "-" in suffix or "−" in suffix)
+    display_amount = abs(amount) if sign_outside_number else amount
+    formatted = f"{display_amount:,.2f}" if "," in match.group(0) else f"{display_amount:.2f}"
+    return prefix + formatted + suffix
+
+
 def numeric_formats(value: str, precision: int) -> list[dict[str, str]]:
     cleaned = value.strip().replace(",", "")
     if not re.fullmatch(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][-+]?\d+)?", cleaned):
@@ -791,12 +810,13 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
         output = output[1:-1]
     kind, dynamic = infer_kind(normalized)
     raw = plain_result(output, kind)
+    display = currency_result(output, raw) if kind == "currency" else output
     formats = numeric_formats(raw, precision) if kind == "math" else []
     rate_date, rate_source, rate_age, rate_stale = ("", "", -1, False)
     if kind == "currency":
         rate_date, rate_source, rate_age, rate_stale = rate_metadata(rate_stale_days)
-    return Evaluation(True, output, raw, kind=kind, normalizedExpression=normalized,
-                      swapExpression=conversion_swap(normalized, output, raw, kind), dynamic=dynamic,
+    return Evaluation(True, display, raw, kind=kind, normalizedExpression=normalized,
+                      swapExpression=conversion_swap(normalized, display, raw, kind), dynamic=dynamic,
                       formats=formats, rateDate=rate_date, rateSource=rate_source,
                       rateAgeDays=rate_age, rateStale=rate_stale)
 

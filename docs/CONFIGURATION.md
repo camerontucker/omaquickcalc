@@ -61,6 +61,10 @@ The generated defaults are:
 Invalid or out-of-range values fall back to safe defaults or are clamped to
 the supported range.
 
+Currency answers are displayed and normally copied with two decimal places.
+The **Copy Unformatted** action and conversion swapping retain Qalculate's full
+numeric precision.
+
 ## Data locations
 
 OmaQuickCalc respects XDG base directories:

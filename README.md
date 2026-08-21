@@ -43,8 +43,8 @@ keyboard-first expression and conversion palette inside `omarchy-shell`.
   </tr>
   <tr>
     <td width="50%">
-      <img src="assets/currency-conversion.png" alt="100 Canadian dollars converted to 72.60535265 US dollars with the current rate date in OmaQuickCalc"><br>
-      <strong>Convert currency with rate context: $72.60535265</strong><br>
+      <img src="assets/currency-conversion.png" alt="100 Canadian dollars converted to 72.61 US dollars with the current rate date in OmaQuickCalc"><br>
+      <strong>Convert currency with rate context: $72.61</strong><br>
       <code>100 CAD in USD</code> shows the rate source and date beside the result.
     </td>
     <td width="50%">
