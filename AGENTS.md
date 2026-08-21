@@ -22,6 +22,8 @@ keyboard-first, single-floating-input experience and keep changes scoped.
   structured results from Qalculate.
 - `omaquickcalc_setup.py` owns the optional, consent-based Hyprland binding and
   reversible launcher lifecycle operations.
+- `omaquickcalc_transform.py` owns explicit numeric-selection capture, private
+  runtime handoff, origin-window validation, and replace-in-place paste.
 - `install.sh` is for local development. Marketplace installation does not run
   lifecycle hooks, so normal installation must remain functional without it.
 - `tests/` covers evaluator behavior and install/launch/upgrade/removal safety.
@@ -37,8 +39,12 @@ change with the permanent plugin ID `io.github.camerontucker.omaquickcalc`.
   standard input. Never interpolate them into shell commands. Clipboard text
   is passed literally after `wl-copy --`; do not switch that path to stdin
   unless the QML process can also close the write channel reliably.
-- Enter, Ctrl+Enter, and clicking a result copy the evaluated result. Equation
-  copying remains a separate Shift+Enter action.
+- Enter, Ctrl+Enter, and clicking a result copy the evaluated result. Shift+Enter
+  replaces the originating selection only in an explicit transform session; it
+  remains the separate equation-copy action during normal launches.
+- Normal launcher opens must not inspect clipboard or selected text. Transform
+  selections must be short and numeric, single-use, private to XDG runtime,
+  excluded from history, and pasted only into the verified originating window.
 - A marketplace install must create a discoverable launcher even when
   `install.sh` is never executed and optional calculator dependencies are
   missing.

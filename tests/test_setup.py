@@ -47,6 +47,7 @@ class ShortcutTests(unittest.TestCase):
         self.assertTrue(first["ok"] and second["ok"])
         self.assertIn('o.bind("SUPER + X", "Mine", "thing")', content)
         self.assertIn('hl.unbind("SUPER + SHIFT + Q")', content)
+        self.assertIn("omaquickcalc_transform.py capture-and-summon", content)
         self.assertNotIn('hl.unbind("SUPER + ALT + Q")', content)
         self.assertEqual(content.count(setup.BINDING_START), 1)
 

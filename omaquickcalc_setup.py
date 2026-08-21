@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import tempfile
 from pathlib import Path
@@ -168,12 +169,15 @@ def ensure_launcher(path: Path, plugin_id: str, version: str) -> dict[str, objec
 
 
 def managed_block(shortcut: str, plugin_id: str) -> str:
+    helper = Path(__file__).resolve().with_name("omaquickcalc_transform.py")
+    command = shlex.join([
+        "python3", str(helper), "capture-and-summon", "--plugin-id", plugin_id,
+    ])
     return (
         f"{BINDING_START}\n"
         "-- Added with explicit consent in OmaQuickCalc's launch setup.\n"
-        f'hl.unbind("{shortcut}")\n'
-        f'o.bind("{shortcut}", "OmaQuickCalc", '
-        f'"omarchy-shell shell toggle {plugin_id} \'{{}}\'")\n'
+        f"hl.unbind({json.dumps(shortcut)})\n"
+        f"o.bind({json.dumps(shortcut)}, \"OmaQuickCalc\", {json.dumps(command)})\n"
         f"{BINDING_END}\n"
     )
 

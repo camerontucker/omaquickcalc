@@ -76,6 +76,7 @@ OmaQuickCalc respects XDG base directories:
 | Persistent history | `~/.local/share/omaquickcalc/history.json` | Retained by normal plugin removal. |
 | Launcher entry | `~/.local/share/applications/io.github.camerontucker.omaquickcalc.desktop` | Removed by `uninstall.sh` only when marked as OmaQuickCalc-managed. |
 | Optional shortcut | marked block in `~/.config/hypr/bindings.lua` | Removed by `uninstall.sh`; unrelated content is preserved. |
+| Transform handoff | `$XDG_RUNTIME_DIR/omaquickcalc/transform` | Private single-use selection state; consumed immediately and stale after one minute. |
 
 To reopen shortcut setup without changing calculator preferences:
 

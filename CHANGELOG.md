@@ -20,6 +20,9 @@
   while retaining full precision for swap and unformatted actions.
 - Convert shorthand times such as `1pm pacific`, `1pm vancouver`, and `1pm pdt`
   to the current local timezone, showing a date only when the day changes.
+- Add Transform in Place: explicitly capture a selected numeric value from the
+  approved shortcut, transform it in the palette, and use Shift+Enter to replace
+  it only in the originating window without persisting the selection.
 - Keep incomplete and out-of-range live expressions from crashing the bundled
   evaluator while the user types.
 - Add automated release-contract, lifecycle, evaluator, shell, Python, and QML

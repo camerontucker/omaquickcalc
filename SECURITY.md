@@ -17,6 +17,16 @@ releases are not maintained separately while the plugin is pre-1.0.
   `qalc` as argument arrays, never interpolated into shell commands.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
+- Normal launcher opens never inspect selected or clipboard text. An approved
+  keyboard shortcut explicitly captures only short text containing a number,
+  restores the previous clipboard immediately, and transfers the selection
+  through a mode-0600 single-use file under `$XDG_RUNTIME_DIR`.
+- The previous clipboard representation exists only in the capture helper's
+  memory until restoration. If its format cannot be restored safely, capture
+  aborts without changing it.
+- Transform sessions are never persisted to calculation history. A transformed
+  result is pasted only after focus returns to the exact Hyprland window where
+  capture began; focus is never forced to another window.
 - Missing `libqalculate`, `wl-clipboard`, or Python support is installed only
   after the user presses Enter. The Omarchy package command opens in a visible
   terminal for normal authentication.
@@ -34,9 +44,11 @@ releases are not maintained separately while the plugin is pre-1.0.
 ## Local data and trust boundaries
 
 Calculation history and preferences remain on the local machine beneath the
-user's XDG data and configuration directories. OmaQuickCalc stores no
-credentials and has no network client of its own. Qalculate may refresh public
-exchange-rate data when the configured refresh setting is enabled.
+user's XDG data and configuration directories. Ephemeral transform state is
+consumed once from the private XDG runtime directory and stale state is removed
+after one minute. OmaQuickCalc stores no credentials and has no network client
+of its own. Qalculate may refresh public exchange-rate data when the configured
+refresh setting is enabled.
 
 `qalcBinary` is an advanced local preference. Changing it selects an executable
 that runs with the user's privileges, so it should point only to a trusted

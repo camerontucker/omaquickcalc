@@ -88,6 +88,15 @@ Item {
   property bool exchangeRefreshForResult: false
   property bool copyCloseAfter: false
   property bool copyProcessStarted: false
+  property bool transformActive: false
+  property string transformToken: ""
+  property string transformOperand: ""
+  property string transformOriginWindow: ""
+  property int transformOriginPid: 0
+  property bool transformOriginTerminal: false
+  property string transformReadOutput: ""
+  property bool transformReadStarted: false
+  property bool replaceProcessStarted: false
 
   // Evaluation state. Processes are allowed to finish while the user types;
   // generations ensure an old result can never replace a newer expression.
@@ -117,6 +126,7 @@ Item {
   readonly property string pluginDir: (manifest && manifest.__sourceDir) || ""
   readonly property string backendPath: pluginDir + "/omaquickcalc_backend.py"
   readonly property string setupHelperPath: pluginDir + "/omaquickcalc_setup.py"
+  readonly property string transformHelperPath: pluginDir + "/omaquickcalc_transform.py"
 
   property string fontFamily: Style.font.menuFamily
   property color background: Color.menu.background
@@ -152,13 +162,13 @@ Item {
       {
         id: "replace",
         label: "Replace Omacalc shortcut",
-        detail: "Super + Ctrl + Q · Omacalc stays installed",
+        detail: "Super + Ctrl + Q · enables selection transforms",
         enabled: true
       },
       {
         id: "alternate",
         label: "Choose another shortcut",
-        detail: "Pick an available keyboard combination",
+        detail: "Pick a shortcut for launch and selection transforms",
         enabled: true
       },
       {
@@ -215,13 +225,13 @@ Item {
     if (setupPage === "alternatives")
       return "Existing bindings are shown before you confirm any replacement."
     if (setupPage === "confirm")
-      return "Only OmaQuickCalc’s marked block in ~/.config/hypr/bindings.lua will be managed."
+      return "The shortcut may capture short numeric selections. Only OmaQuickCalc’s marked binding block is managed."
     if (setupPage === "applying")
       return "Validating the binding with Hyprland. A failed change is rolled back automatically."
     if (setupPage === "error") return "Your previous Hyprland configuration is still intact."
     if (!launcherChecked) return "Preparing the Super + Space launcher entry. A shortcut is optional."
     if (launcherReady)
-      return "A launcher entry is ready in Super + Space. A keyboard shortcut is optional."
+      return "Super + Space stays clipboard-blind. A selection-aware keyboard shortcut is optional."
     return "An existing unowned launcher entry was left untouched. A shortcut is optional."
   }
   readonly property string displayResult: CalcModel.singleLine(result)
@@ -263,11 +273,19 @@ Item {
     root.actionMenuOpen = false
     root.clearConfirmOpen = false
     root.pendingAction = ""
+    root.transformActive = false
+    root.transformToken = String(payload.transformToken || "")
+    root.transformOperand = ""
+    root.transformOriginWindow = ""
+    root.transformOriginPid = 0
+    root.transformOriginTerminal = false
     root.expression = payload.expression ? String(payload.expression) : ""
     root.result = ""
     root.clearResultMetadata()
     root.errorText = ""
-    root.statusText = ""
+    root.statusText = root.transformToken ? "Reading selected text…" : ""
+
+    if (root.transformToken) root.startTransformRead()
 
     if (!root.backendChecked || !root.backendAvailable) root.startBackendCheck()
     if (root.setupForced || !root.launchSetupComplete) root.beginLaunchSetup()
@@ -286,6 +304,12 @@ Item {
     root.setupOpen = false
     root.setupForced = false
     root.pendingAction = ""
+    root.transformActive = false
+    root.transformToken = ""
+    root.transformOperand = ""
+    root.transformOriginWindow = ""
+    root.transformOriginPid = 0
+    root.transformOriginTerminal = false
     root.installRequested = false
     installerPoll.stop()
     evaluationTimer.stop()
@@ -357,6 +381,49 @@ Item {
     })
   }
 
+  function startTransformRead() {
+    if (!root.transformToken || selectionRead.running) return
+    root.transformReadOutput = ""
+    root.transformReadStarted = true
+    selectionRead.command = [
+      "python3", root.transformHelperPath, "consume", "--token", root.transformToken
+    ]
+    selectionRead.running = true
+  }
+
+  function finishTransformRead(exitCode) {
+    if (!root.transformReadStarted) return
+    root.transformReadStarted = false
+    root.transformToken = ""
+    var payload = ({})
+    try { payload = JSON.parse(root.transformReadOutput || "{}") } catch (error) { payload = ({}) }
+    root.transformReadOutput = ""
+    if (!root.opened) return
+    if (exitCode !== 0 || !payload.selection || !payload.windowAddress || !payload.windowPid) {
+      root.statusText = "No numeric selection found"
+      return
+    }
+    root.transformActive = true
+    root.transformOperand = String(payload.selection)
+    root.transformOriginWindow = String(payload.windowAddress)
+    root.transformOriginPid = Number(payload.windowPid)
+    root.transformOriginTerminal = Boolean(payload.terminal)
+    root.statusText = ""
+    root.scheduleEvaluation()
+    root.focusCalculator()
+  }
+
+  function calculationExpression() {
+    var query = root.expression.trim()
+    var operand = root.transformOperand.trim()
+    if (!root.transformActive || !operand) return query
+    if (!query) return operand
+    if (/^[+-]?\d+(?:\.\d+)?%\s+off$/i.test(query)) return query + " " + operand
+    if (/^[+-]?\d+(?:\.\d+)?%\s+tip$/i.test(query)) return query + " on " + operand
+    if (/^in\s+/i.test(query)) return operand + " to " + query.replace(/^in\s+/i, "")
+    return operand + " " + query
+  }
+
   function beginLaunchSetup() {
     root.setupOpen = true
     root.setupPage = "choices"
@@ -379,7 +446,7 @@ Item {
   function loadLaunchState(raw) {
     var state = ({})
     try { state = JSON.parse(String(raw || "{}")) } catch (error) { state = ({}) }
-    root.launchSetupComplete = state.version === 1 && Boolean(state.complete)
+    root.launchSetupComplete = state.version === 2 && Boolean(state.complete)
     root.launchStateLoaded = true
     if (!root.opened) return
     if (root.setupForced || !root.launchSetupComplete) {
@@ -389,7 +456,7 @@ Item {
 
   function saveLaunchState(choice, shortcut) {
     var state = {
-      version: 1,
+      version: 2,
       complete: true,
       choice: String(choice || "skip"),
       shortcut: String(shortcut || "")
@@ -608,6 +675,8 @@ Item {
   }
 
   function addCurrentToHistory() {
+    // Selected text is intentionally session-only and never written to history.
+    if (root.transformActive) return
     if (root.settings.historyMode === "disabled" || !root.expression.trim() || !root.result) return
     root.history = CalcModel.addHistoryEntry(root.history, {
       expression: root.expression.trim(),
@@ -710,7 +779,7 @@ Item {
   function scheduleEvaluation() {
     root.pendingAction = ""
     root.evaluationGeneration += 1
-    root.pendingExpression = root.expression.trim()
+    root.pendingExpression = root.calculationExpression()
     root.pendingTimeoutMs = root.settings.previewTimeoutMs
     root.result = ""
     root.clearResultMetadata()
@@ -723,7 +792,7 @@ Item {
   function requestImmediateEvaluation(action) {
     evaluationTimer.stop()
     root.evaluationGeneration += 1
-    root.pendingExpression = root.expression.trim()
+    root.pendingExpression = root.calculationExpression()
     root.pendingTimeoutMs = root.settings.submitTimeoutMs
     root.pendingAction = action
     root.result = ""
@@ -787,7 +856,7 @@ Item {
     if (!root.activeProcessExited || !root.activeStdoutFinished || !root.activeStderrFinished) return
 
     var isCurrent = root.activeGeneration === root.evaluationGeneration
-      && root.activeExpression === root.expression.trim()
+      && root.activeExpression === root.calculationExpression()
 
     if (isCurrent) {
       var nextResult = root.normalizeOutput(root.activeOutput)
@@ -835,7 +904,7 @@ Item {
       root.requestDependencyInstall()
       return
     }
-    if (!root.expression.trim()) {
+    if (!root.calculationExpression()) {
       root.dismiss()
       return
     }
@@ -849,6 +918,11 @@ Item {
   function completeAction(action) {
     if (!root.result) return
     root.addCurrentToHistory()
+
+    if (action === "replace-selection") {
+      root.replaceSelection()
+      return
+    }
 
     if (action === "reuse") {
       var reused = root.rawResult || root.result
@@ -901,7 +975,29 @@ Item {
 
   function copyEquation() {
     if (!root.result) return
-    root.queueCopy(root.expression.trim() + " = " + root.result, false)
+    root.queueCopy(root.calculationExpression() + " = " + root.result, false)
+  }
+
+  function replaceSelection() {
+    if (!root.transformActive || !root.result || !root.transformOriginWindow
+        || root.transformOriginPid <= 0) return
+    if (!root.clipboardChecked || !root.clipboardAvailable) {
+      root.statusText = "Clipboard support is unavailable"
+      if (root.clipboardChecked) root.requestDependencyInstall()
+      else root.startBackendCheck()
+      return
+    }
+    if (replaceProcess.running) return
+    root.replaceProcessStarted = true
+    replaceProcess.command = [
+      "python3", root.transformHelperPath, "replace",
+      "--window-address", root.transformOriginWindow,
+      "--window-pid", String(root.transformOriginPid),
+      "--result=" + String(root.result)
+    ]
+    if (root.transformOriginTerminal) replaceProcess.command.push("--terminal")
+    replaceProcess.running = true
+    Qt.callLater(function() { root.dismiss() })
   }
 
   function rebuildActionItems() {
@@ -911,6 +1007,9 @@ Item {
       { id: "copy-equation", label: "Copy Question & Answer", value: "", enabled: root.clipboardAvailable },
       { id: "reuse", label: "Use Answer as Input", value: "", enabled: true }
     ]
+    if (root.transformActive)
+      items.splice(1, 0, { id: "replace-selection", label: "Replace Selection", value: "",
+        enabled: root.clipboardAvailable })
     if (root.swapExpression)
       items.push({ id: "swap", label: "Swap Units", value: root.swapExpression, enabled: true })
     if (root.resultKind === "currency")
@@ -949,9 +1048,10 @@ Item {
       return
     }
     if (action.id === "copy") root.copyText(root.result, false)
+    else if (action.id === "replace-selection") root.completeAction("replace-selection")
     else if (action.id === "copy-raw" || action.id === "format") root.copyText(action.value, false)
     else if (action.id === "copy-equation") {
-      root.copyText(root.expression.trim() + " = " + root.result, false)
+      root.copyText(root.calculationExpression() + " = " + root.result, false)
     } else if (action.id === "reuse") root.completeAction("reuse")
     else if (action.id === "swap") {
       root.actionMenuOpen = false
@@ -1170,6 +1270,7 @@ Item {
       if (root.actionMenuOpen) root.executeSelectedAction()
       else if (root.historyOpen) root.recallSelectedHistory()
       else if (alt) root.toggleDetail()
+      else if (shift && root.transformActive) root.submit("replace-selection")
       else if (shift) root.submit("copy-equation")
       else if (control) root.submit("copy-stay")
       else root.submit("")
@@ -1287,6 +1388,36 @@ Item {
           if (root.setupApplyStarted) root.finishSetupApply(127)
         })
       }
+    }
+  }
+
+  Process {
+    id: selectionRead
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.transformReadOutput = text
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      Qt.callLater(function() { root.finishTransformRead(exitCode) })
+    }
+    onRunningChanged: {
+      if (!running && root.transformReadStarted) {
+        Qt.callLater(function() {
+          if (root.transformReadStarted) root.finishTransformRead(127)
+        })
+      }
+    }
+  }
+
+  Process {
+    id: replaceProcess
+    stdout: StdioCollector { waitForEnd: true }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: root.replaceProcessStarted = false
+    onRunningChanged: {
+      if (!running && root.replaceProcessStarted)
+        Qt.callLater(function() { root.replaceProcessStarted = false })
     }
   }
 
@@ -1627,12 +1758,28 @@ Item {
           visible: !root.setupOpen
 
           Text {
+            id: transformOperandLabel
             anchors.left: parent.left
+            anchors.verticalCenter: parent.verticalCenter
+            visible: root.transformActive && root.transformOperand.length > 0
+            width: visible ? Math.min(inputRow.width * 0.38,
+              Math.max(Style.space(90), root.transformOperand.length * Style.font.heading * 0.62)) : 0
+            text: root.transformOperand + "  →"
+            color: root.accent
+            opacity: 0.72
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.heading
+            elide: Text.ElideRight
+          }
+
+          Text {
+            anchors.left: transformOperandLabel.visible ? transformOperandLabel.right : parent.left
+            anchors.leftMargin: transformOperandLabel.visible ? Style.spacing.md : 0
             anchors.right: outputArea.left
             anchors.rightMargin: Style.spacing.md
             anchors.verticalCenter: parent.verticalCenter
             visible: root.expression.length === 0
-            text: root.settings.inputHint
+            text: root.transformActive ? "in USD, 20% off, in cm…" : root.settings.inputHint
             color: root.foreground
             opacity: 0.48
             font.family: root.fontFamily
@@ -1642,7 +1789,8 @@ Item {
 
           TextInput {
             id: expressionInput
-            anchors.left: parent.left
+            anchors.left: transformOperandLabel.visible ? transformOperandLabel.right : parent.left
+            anchors.leftMargin: transformOperandLabel.visible ? Style.spacing.md : 0
             anchors.right: outputArea.left
             anchors.rightMargin: Style.spacing.md
             anchors.verticalCenter: parent.verticalCenter
@@ -1743,7 +1891,7 @@ Item {
               id: copyResultHint
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              text: "↵ Copy"
+              text: root.transformActive ? "⇧↵ Replace" : "↵ Copy"
               color: root.foreground
               opacity: 0.46
               font.family: root.fontFamily
@@ -2001,7 +2149,9 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            text: "Alt+Enter collapse   Enter copy result   Shift+Enter copy equation"
+            text: root.transformActive
+              ? "Alt+Enter collapse   Enter copy result   Shift+Enter replace selection"
+              : "Alt+Enter collapse   Enter copy result   Shift+Enter copy equation"
             color: root.foreground
             opacity: 0.42
             font.family: root.fontFamily

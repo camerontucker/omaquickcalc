@@ -1,14 +1,14 @@
 # OmaQuickCalc
 
 <p align="center">
-  <strong>One floating input. Instant answers.</strong><br>
+  <strong>Select it. Transform it. Put it straight back.</strong><br>
   A Raycast-style quick calculator built for Omarchy Quattro.
 </p>
 
-![OmaQuickCalc calculating from a single floating input](preview.png)
+![OmaQuickCalc converting a selected 100 CAD invoice value to 72.61 USD](preview.png)
 
 <p align="center">
-  <a href="assets/omaquickcalc-demo.mp4"><strong>Watch the quick demo</strong></a>
+  <a href="assets/omaquickcalc-demo.mp4"><strong>Watch Transform in Place</strong></a>
   ·
   <a href="#install"><strong>Install</strong></a>
   ·
@@ -18,13 +18,45 @@
 </p>
 
 OmaQuickCalc turns a calculation into one short keyboard flow: launch, type,
-press Enter, paste the result. There is no mode switch—the expression decides
-whether you are doing arithmetic, converting currency, comparing timezones, or
-translating a color.
+press Enter, paste the result. Select a value before using your configured
+shortcut and it becomes an operand you can transform and replace in place.
+There is no mode switch—the expression decides whether you are doing
+arithmetic, converting currency, comparing timezones, or translating a color.
 
 It complements the official [Omacalc](https://github.com/omacom-io/omacalc).
 Omacalc is a traditional standalone calculator with a keypad; OmaQuickCalc is a
 keyboard-first expression and conversion palette inside `omarchy-shell`.
+
+## Transform in Place
+
+Highlight `100 CAD` in any application, summon OmaQuickCalc with its configured
+shortcut, and type `in USD`. The selected operand remains visible beside the
+query and the live result is `$72.61`.
+
+- Press `Enter` to copy the answer normally.
+- Press `Shift+Enter` to close the palette and replace the original selection.
+
+The same flow handles `125` → `20% off`, `64px` → `in rem`,
+`5 ft 11 in` → `in cm`, and a complete selection such as `1pm pacific`.
+Normal launcher opens never read selected or clipboard text. Selection capture
+happens only after invoking a shortcut the user explicitly approved during
+setup, accepts only short text containing a number, and never writes transform
+sessions to calculation history.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/transform-selected.png" alt="100 CAD selected in an Omawrite client invoice"><br>
+      <strong>1. Select the value</strong><br>
+      The surrounding document stays exactly where you were working.
+    </td>
+    <td width="50%">
+      <img src="assets/transform-replaced.png" alt="The selected invoice value replaced with 72.61 dollars in Omawrite"><br>
+      <strong>2. Shift+Enter puts the answer back</strong><br>
+      Only the originating selection becomes <code>$72.61</code>.
+    </td>
+  </tr>
+</table>
 
 ## Try asking
 
@@ -66,6 +98,8 @@ close; use `Ctrl+Enter` to copy without leaving the palette.
 
 ## Why it feels at home in Omarchy
 
+- **Transform in place.** Turn a selected value into a result and send it
+  straight back to the originating application without a copy/paste loop.
 - **Fast by default.** Live evaluation, result chaining, searchable history,
   and contextual actions stay inside one focused overlay.
 - **More than arithmetic.** Qalculate powers units, constants, functions, and
@@ -93,9 +127,10 @@ Normal marketplace installation does not execute `install.sh`, and
 OmaQuickCalc does not depend on it. Once enabled, the overlay creates its owned
 launcher entry on load. On first use it checks its three runtime dependencies:
 
-- `python` runs the bundled evaluator and safe launch-setup helper.
+- `python` runs the bundled evaluator and safe launch and transform helpers.
 - `libqalculate` provides `qalc`, the local calculation engine.
-- `wl-clipboard` provides `wl-copy` for result copying.
+- `wl-clipboard` provides `wl-copy` for results and `wl-paste` for explicit
+  selection capture.
 
 If one is missing, pressing Enter on the dependency prompt opens Omarchy's
 package command in a visible terminal for normal authentication. Nothing is
@@ -121,6 +156,8 @@ press Enter. The first-run screen offers three choices:
 
 No shortcut is changed until you see the exact effect and confirm it. Replacing
 the binding does not uninstall Omacalc; it remains available from the launcher.
+The approved shortcut also enables explicit selection capture for Transform in
+Place; ordinary Super + Space launcher opens remain clipboard-blind.
 Right-click OmaQuickCalc in a desktop-entry-aware launcher and select
 **Configure launch shortcut** to revisit this screen.
 
@@ -138,7 +175,7 @@ omarchy-shell shell summon io.github.camerontucker.omaquickcalc \
 | --- | --- |
 | `Enter` | Run the configured default action: copy result and close initially |
 | `Ctrl+Enter` | Copy the result and keep the palette open |
-| `Shift+Enter` | Copy `expression = result` |
+| `Shift+Enter` | Replace the originating selection during Transform in Place; otherwise copy `expression = result` |
 | `Tab` | Replace the expression with its result for chaining |
 | `Alt+Enter` | Expand or collapse the full result or error |
 | `Ctrl+K` | Open contextual result and format actions |
@@ -151,7 +188,8 @@ omarchy-shell shell summon io.github.camerontucker.omaquickcalc \
 | `Escape` | Close a panel, clear the input, then close the palette |
 
 Enter, `Ctrl+Enter`, and clicking the displayed result copy the evaluated
-**result**. Copying the equation is always the separate `Shift+Enter` action.
+**result**. Shift+Enter replaces an explicitly captured selection; during a
+normal launch it remains the separate equation-copy action.
 
 ## Configuration
 
@@ -169,6 +207,12 @@ Calculations happen locally through the bundled Python evaluator and `qalc`.
 OmaQuickCalc has no account, telemetry, advertising, or API key. Expressions
 are passed as process arguments rather than interpolated into shell commands,
 and copied results are passed literally after `wl-copy --`.
+
+Transform in Place is initiated only by the optional shortcut that the user
+approved. Its numeric selection is held in a private, single-use file beneath
+`$XDG_RUNTIME_DIR`, consumed immediately by the overlay, and excluded from
+history. The previous clipboard is restored after capture. Replacement occurs
+only if focus returns to the exact window where capture began.
 
 History can be persistent, session-only, or disabled. Persistent history stays
 in `~/.local/share/omaquickcalc/history.json`; pinned entries survive normal
@@ -188,7 +232,9 @@ omarchy plugin update io.github.camerontucker.omaquickcalc
 ```
 
 Omarchy shows the incoming update for review. The launcher entry refreshes when
-the updated plugin loads; `install.sh` is not needed.
+the updated plugin loads; `install.sh` is not needed. The Transform in Place
+upgrade reopens shortcut setup once so existing users can explicitly approve
+selection capture or keep a clipboard-blind launcher-only workflow.
 
 ## Remove
 

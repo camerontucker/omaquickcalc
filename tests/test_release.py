@@ -47,7 +47,10 @@ class ReleaseContractTests(unittest.TestCase):
             with self.subTest(path=relative_path):
                 self.assertTrue((REPOSITORY / relative_path).is_file())
 
-        for relative_path in ("install.sh", "uninstall.sh", "omaquickcalc_setup.py"):
+        for relative_path in (
+            "install.sh", "uninstall.sh", "omaquickcalc_setup.py",
+            "omaquickcalc_transform.py",
+        ):
             mode = (REPOSITORY / relative_path).stat().st_mode
             self.assertTrue(mode & stat.S_IXUSR, f"{relative_path} must be executable")
 
@@ -91,9 +94,13 @@ class ReleaseContractTests(unittest.TestCase):
         standard_library = {
             "argparse", "calendar", "colorsys", "dataclasses", "datetime", "decimal",
             "fractions", "json", "locale", "math", "os", "pathlib", "re",
-            "subprocess", "sys", "tempfile", "unicodedata", "zoneinfo", "__future__",
+            "secrets", "shlex", "stat", "subprocess", "sys", "tempfile",
+            "time", "unicodedata", "zoneinfo", "__future__",
         }
-        for relative_path in ("omaquickcalc_backend.py", "omaquickcalc_setup.py"):
+        for relative_path in (
+            "omaquickcalc_backend.py", "omaquickcalc_setup.py",
+            "omaquickcalc_transform.py",
+        ):
             tree = ast.parse((REPOSITORY / relative_path).read_text(encoding="utf-8"))
             imported = {
                 node.names[0].name.split(".")[0]
@@ -120,6 +127,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('"--expression", root.activeExpression', qml)
         self.assertNotRegex(qml, r"bash.*(?:expression|evaluatedResult|activeExpression|result)")
 
+        transform = (REPOSITORY / "omaquickcalc_transform.py").read_text(encoding="utf-8")
+        self.assertNotIn("shell=True", transform)
+        self.assertIn('["wl-copy", "--", result]', transform)
+
+    def test_transform_in_place_contract(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        setup = (REPOSITORY / "omaquickcalc_setup.py").read_text(encoding="utf-8")
+        self.assertIn('root.submit("replace-selection")', qml)
+        self.assertIn("if (root.transformActive) return", qml)
+        self.assertIn('"consume", "--token"', qml)
+        self.assertIn('return query + " " + operand', qml)
+        self.assertIn('return operand + " to " + query.replace', qml)
+        self.assertIn("state.version === 2", qml)
+        self.assertIn("capture-and-summon", setup)
+
     def test_valid_result_uses_a_distinct_copyable_second_row(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         self.assertIn(
@@ -127,7 +149,7 @@ class ReleaseContractTests(unittest.TestCase):
             qml,
         )
         self.assertIn("id: resultRow", qml)
-        self.assertIn('text: "↵ Copy"', qml)
+        self.assertIn('root.transformActive ? "⇧↵ Replace" : "↵ Copy"', qml)
         self.assertIn("Math.round(Style.font.heading * 1.5)", qml)
         self.assertIn('onClicked: root.submit("copy-close")', qml)
 
