@@ -48,8 +48,11 @@ jobs:
           bash -n install.sh uninstall.sh
           python3 -m py_compile omaquickcalc_backend.py omaquickcalc_setup.py
 
-      - name: Check QML syntax
-        run: /usr/lib/qt6/bin/qmllint OmaQuickCalc.qml
+      - name: Parse QML
+        # The hosted runner does not ship Quickshell or Omarchy's qs.* modules.
+        # qmlformat still parses the complete file and fails on invalid QML;
+        # full qmllint runs on Omarchy during the release preflight.
+        run: /usr/lib/qt6/bin/qmlformat OmaQuickCalc.qml >/dev/null
 
       - name: Check whitespace
         run: git show --check --format= --no-renames HEAD
