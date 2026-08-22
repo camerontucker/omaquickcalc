@@ -2277,6 +2277,7 @@ Item {
             width: visible ? Math.min(inputRow.width * 0.38,
               Math.max(Style.space(90), root.transformOperand.length * Style.font.heading * 0.62)) : 0
             text: root.transformOperand + "  →"
+            textFormat: Text.PlainText
             color: root.accent
             opacity: 0.72
             font.family: root.fontFamily

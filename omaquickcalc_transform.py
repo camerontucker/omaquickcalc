@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import selectors
 import stat
 import subprocess
 import sys
@@ -17,6 +18,9 @@ from pathlib import Path
 
 
 MAX_SELECTION_LENGTH = 512
+MAX_SELECTION_BYTES = MAX_SELECTION_LENGTH * 4
+MAX_CLIPBOARD_TYPES_BYTES = 16_384
+MAX_CLIPBOARD_SNAPSHOT_BYTES = 16 * 1024 * 1024
 MAX_RESULT_LENGTH = 65_536
 STATE_MAX_AGE_SECONDS = 60
 PENDING_WAIT_SECONDS = 1.5
@@ -106,14 +110,63 @@ def send_shortcut(modifiers: str, key: str, window_address: str = "") -> bool:
     return True
 
 
-def clipboard_snapshot() -> ClipboardSnapshot | None:
-    types = subprocess.run(
-        ["wl-paste", "--list-types"], capture_output=True, text=True,
-        timeout=1, check=False,
+def _read_bounded_output(command: list[str], byte_limit: int,
+                         timeout: float) -> bytes | None:
+    """Read a clipboard owner without allowing unbounded buffering."""
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
     )
-    if types.returncode != 0:
+    if process.stdout is None:
+        process.kill()
+        process.wait()
+        raise RuntimeError("Unable to read clipboard content safely")
+
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    output = bytearray()
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not selector.select(remaining):
+                raise subprocess.TimeoutExpired(command, timeout)
+            chunk = os.read(
+                process.stdout.fileno(),
+                min(65_536, byte_limit + 1 - len(output)),
+            )
+            if not chunk:
+                break
+            output.extend(chunk)
+            if len(output) > byte_limit:
+                raise RuntimeError("Clipboard content exceeds safe capture limit")
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, timeout)
+        if process.wait(timeout=remaining) != 0:
+            return None
+        return bytes(output)
+    finally:
+        selector.close()
+        process.stdout.close()
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+
+
+def clipboard_snapshot() -> ClipboardSnapshot | None:
+    types = _read_bounded_output(
+        ["wl-paste", "--list-types"], MAX_CLIPBOARD_TYPES_BYTES, 1,
+    )
+    if types is None:
         return None
-    offered = [line.strip() for line in types.stdout.splitlines() if line.strip()]
+    offered = [
+        line.strip()
+        for line in types.decode("utf-8", errors="replace").splitlines()
+        if line.strip()
+    ]
     priorities = (
         "text/plain;charset=utf-8", "text/plain", "UTF8_STRING",
         "image/png", "text/uri-list",
@@ -123,13 +176,12 @@ def clipboard_snapshot() -> ClipboardSnapshot | None:
         if offered:
             raise RuntimeError("The current clipboard format cannot be restored safely")
         return None
-    content = subprocess.run(
-        ["wl-paste", "--type", mime_type], capture_output=True,
-        timeout=2, check=False,
+    content = _read_bounded_output(
+        ["wl-paste", "--type", mime_type], MAX_CLIPBOARD_SNAPSHOT_BYTES, 2,
     )
-    if content.returncode != 0:
+    if content is None:
         return None
-    return ClipboardSnapshot(mime_type, content.stdout)
+    return ClipboardSnapshot(mime_type, content)
 
 
 def restore_clipboard(snapshot: ClipboardSnapshot | None) -> None:
@@ -148,13 +200,13 @@ def restore_clipboard(snapshot: ClipboardSnapshot | None) -> None:
 
 
 def read_clipboard_text() -> str:
-    process = subprocess.run(
+    content = _read_bounded_output(
         ["wl-paste", "--no-newline", "--type", "text/plain"],
-        capture_output=True, timeout=1, check=False,
+        MAX_SELECTION_BYTES, 1,
     )
-    if process.returncode != 0:
+    if content is None:
         return ""
-    return process.stdout.decode("utf-8", errors="replace")
+    return content.decode("utf-8", errors="replace")
 
 
 def normalize_selection(value: str) -> str:
@@ -348,7 +400,7 @@ def replace_selection(result: str, window_address: str,
         if (str(window.get("address", "")) == window_address
                 and int(window.get("pid", 0) or 0) == window_pid):
             modifiers, key = (("SHIFT", "INSERT") if terminal else ("CTRL", "V"))
-            return 0 if send_shortcut(modifiers, key) else 1
+            return 0 if send_shortcut(modifiers, key, window_address) else 1
         time.sleep(0.05)
     return 1
 

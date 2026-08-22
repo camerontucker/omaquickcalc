@@ -1,5 +1,6 @@
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -69,13 +70,56 @@ class TransformStateTests(unittest.TestCase):
 
 
 class TransformWorkflowTests(unittest.TestCase):
-    @patch("omaquickcalc_transform.subprocess.run")
-    def test_capture_refuses_an_unrestorable_clipboard_format(self, run):
-        run.return_value = subprocess.CompletedProcess(
-            [], 0, "application/x-secret\n", ""
-        )
+    @patch("omaquickcalc_transform._read_bounded_output",
+           return_value=b"application/x-secret\n")
+    def test_capture_refuses_an_unrestorable_clipboard_format(self, _read):
         with self.assertRaisesRegex(RuntimeError, "cannot be restored"):
             transform.clipboard_snapshot()
+
+    @patch("omaquickcalc_transform._read_bounded_output",
+           side_effect=[b"text/plain\n", b"previous"])
+    def test_clipboard_snapshot_applies_the_restore_byte_limit(self, read):
+        self.assertEqual(
+            transform.clipboard_snapshot(),
+            transform.ClipboardSnapshot("text/plain", b"previous"),
+        )
+        self.assertEqual(
+            read.call_args_list[1].args,
+            (
+                ["wl-paste", "--type", "text/plain"],
+                transform.MAX_CLIPBOARD_SNAPSHOT_BYTES,
+                2,
+            ),
+        )
+
+    def test_clipboard_output_is_rejected_at_the_byte_limit(self):
+        command = [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(b'x' * 129)",
+        ]
+        with self.assertRaisesRegex(RuntimeError, "safe capture limit"):
+            transform._read_bounded_output(command, 128, 1)
+
+    def test_bounded_clipboard_reader_preserves_ordinary_output(self):
+        command = [
+            sys.executable,
+            "-c",
+            "import sys; sys.stdout.buffer.write(b'100 CAD')",
+        ]
+        self.assertEqual(
+            transform._read_bounded_output(command, 128, 1),
+            b"100 CAD",
+        )
+
+    @patch("omaquickcalc_transform._read_bounded_output", return_value=b"100 CAD")
+    def test_selection_read_applies_the_raw_byte_limit(self, read):
+        self.assertEqual(transform.read_clipboard_text(), "100 CAD")
+        read.assert_called_once_with(
+            ["wl-paste", "--no-newline", "--type", "text/plain"],
+            transform.MAX_SELECTION_BYTES,
+            1,
+        )
 
     @patch("omaquickcalc_transform.restore_clipboard")
     @patch("omaquickcalc_transform.read_clipboard_text",
@@ -123,7 +167,7 @@ class TransformWorkflowTests(unittest.TestCase):
         status = transform.replace_selection("$72.61", "0xabc", 4242, False)
         self.assertEqual(status, 0)
         active.assert_called_once()
-        send.assert_called_once_with("CTRL", "V")
+        send.assert_called_once_with("CTRL", "V", "0xabc")
         self.assertEqual(run.call_args_list[0].args[0], ["wl-copy", "--", "$72.61"])
 
     @patch("omaquickcalc_transform.send_shortcut")

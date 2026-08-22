@@ -96,7 +96,7 @@ class ReleaseContractTests(unittest.TestCase):
         standard_library = {
             "argparse", "calendar", "colorsys", "dataclasses", "datetime", "decimal",
             "fractions", "json", "locale", "math", "os", "pathlib", "re",
-            "secrets", "shlex", "stat", "subprocess", "sys", "tempfile",
+            "secrets", "selectors", "shlex", "stat", "subprocess", "sys", "tempfile",
             "time", "typing", "unicodedata", "zoneinfo", "__future__",
             "omaquickcalc_tax",
         }
@@ -177,6 +177,10 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertNotIn("No numeric selection found", qml)
         self.assertIn("state.version === 2", qml)
         self.assertIn("capture-and-summon", setup)
+        transform_label = qml.split("id: transformOperandLabel", 1)[1].split(
+            "\n          }", 1
+        )[0]
+        self.assertIn("textFormat: Text.PlainText", transform_label)
 
     def test_valid_result_uses_a_distinct_copyable_second_row(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")

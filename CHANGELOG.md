@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Harden Transform in Place by rendering captured selections as plain text,
+  bounding clipboard-owner output, and targeting replacement paste events to
+  the verified originating window.
+
 ## 0.6.0 — 2026-08-22
 
 - Show compact example calculations in the reserved result row after three

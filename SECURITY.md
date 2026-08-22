@@ -18,18 +18,19 @@ releases are not maintained separately while the plugin is pre-1.0.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
 - Normal launcher opens never inspect selected or clipboard text. An approved
-  keyboard shortcut explicitly captures only short text containing a number,
-  restores the previous clipboard immediately, and transfers the selection
-  through a mode-0600 single-use file under `$XDG_RUNTIME_DIR`.
+  keyboard shortcut explicitly captures only byte- and character-bounded text
+  containing a number, renders it as plain text, restores the previous
+  clipboard immediately, and transfers the selection through a mode-0600
+  single-use file under `$XDG_RUNTIME_DIR`.
 - The shortcut summons the palette before targeted capture completes. Its
   pending handoff contains only the validated origin window, remains private,
   and is atomically completed or expires without enabling replacement.
 - The previous clipboard representation exists only in the capture helper's
-  memory until restoration. If its format cannot be restored safely, capture
-  aborts without changing it.
+  bounded memory until restoration. If its format or size cannot be restored
+  safely, capture aborts without changing it.
 - Transform sessions are never persisted to calculation history. A transformed
-  result is pasted only after focus returns to the exact Hyprland window where
-  capture began; focus is never forced to another window.
+  result is pasted with an explicit target only after focus returns to the exact
+  Hyprland window where capture began; focus is never forced to another window.
 - Missing `libqalculate`, `wl-clipboard`, or Python support is installed only
   after the user presses Enter. The Omarchy package command opens in a visible
   terminal for normal authentication.
