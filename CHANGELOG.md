@@ -14,6 +14,8 @@
   during removal.
 - Replace the competing inline first-run dependency prompt with a dedicated,
   consent-based calculator-engine step that continues automatically.
+- Rewrite shortcut onboarding in plain language without exposing binding-file
+  implementation details.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,
