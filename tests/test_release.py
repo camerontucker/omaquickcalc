@@ -168,19 +168,31 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('"consume", "--token"', qml)
         self.assertIn('return query + " " + operand', qml)
         self.assertIn('return operand + " to " + query.replace', qml)
+        self.assertIn('root.transformActive ? "↵ Replace" : "↵ Copy"', qml)
+        self.assertIn('else if (root.transformActive) root.submit("replace-selection")', qml)
+        self.assertNotIn("Reading selected text", qml)
+        self.assertNotIn("No numeric selection found", qml)
         self.assertIn("state.version === 2", qml)
         self.assertIn("capture-and-summon", setup)
 
     def test_valid_result_uses_a_distinct_copyable_second_row(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
-        self.assertIn(
-            "readonly property int resultRowHeight: result.length > 0",
-            qml,
-        )
+        self.assertIn("readonly property bool resultRowReserved:", qml)
+        self.assertIn("readonly property int resultRowHeight: resultRowReserved", qml)
+        self.assertIn("interval: 200", qml)
+        self.assertIn("if (Boolean(payload.pending)) root.errorText = \"\"", qml)
         self.assertIn("id: resultRow", qml)
-        self.assertIn('root.transformActive ? "⇧↵ Replace" : "↵ Copy"', qml)
+        self.assertIn('root.transformActive ? "↵ Replace" : "↵ Copy"', qml)
         self.assertIn("Math.round(Style.font.heading * 1.5)", qml)
         self.assertIn('onClicked: root.submit("copy-close")', qml)
+
+    def test_time_format_is_available_in_preferences(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        model = (REPOSITORY / "OmaQuickCalcModel.js").read_text(encoding="utf-8")
+        self.assertIn('{ id: "clock-format", label: "Time format"', qml)
+        self.assertIn('readonly property var clockFormatChoices: ["12", "24", "auto"]', qml)
+        self.assertIn('root.updateSettings({ clockFormat:', qml)
+        self.assertIn('clockFormat: "12"', model)
 
     def test_translucent_card_tracks_wallpaper_contrast(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
@@ -199,6 +211,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('id: shortcutHelpPane', qml)
         self.assertIn('items.push({ id: "preferences"', qml)
         self.assertNotIn('if (!root.result) return\n    root.historyOpen', qml)
+        self.assertIn('else root.moveHistorySelection(root.historyOpen ? 1 : 0)', qml)
 
     def test_quattro_easter_egg_stays_subtle_and_copyable(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")

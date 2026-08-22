@@ -39,9 +39,9 @@ change with the permanent plugin ID `io.github.camerontucker.omaquickcalc`.
   standard input. Never interpolate them into shell commands. Clipboard text
   is passed literally after `wl-copy --`; do not switch that path to stdin
   unless the QML process can also close the write channel reliably.
-- Enter, Ctrl+Enter, and clicking a result copy the evaluated result. Shift+Enter
-  replaces the originating selection only in an explicit transform session; it
-  remains the separate equation-copy action during normal launches.
+- Enter and clicking a result copy the evaluated result during normal launches;
+  Ctrl+Enter copies and stays open. In an explicit transform session, Enter and
+  Shift+Enter replace the originating selection while Ctrl+Enter copies instead.
 - Normal launcher opens must not inspect clipboard or selected text. Transform
   selections must be short and numeric, single-use, private to XDG runtime,
   excluded from history, and pasted only into the verified originating window.
@@ -63,6 +63,8 @@ change with the permanent plugin ID `io.github.camerontucker.omaquickcalc`.
   card—not the theme background alone—and refresh while the overlay is open.
 - Old evaluation processes must never replace newer input; retain generation
   checks when changing evaluation flow.
+- Reserve the result row as soon as calculation input begins and keep the
+  200ms typing debounce; live results must not resize the card per keystroke.
 
 ## Verification
 

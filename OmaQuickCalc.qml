@@ -165,7 +165,9 @@ Item {
   readonly property int cornerRadius: Style.cornerRadius
   readonly property int contentMargin: Style.space(18)
   readonly property int rowContentHeight: Math.max(Style.space(36), Style.font.heading + Style.space(8))
-  readonly property int resultRowHeight: result.length > 0 ? Style.space(68) : 0
+  readonly property bool resultRowReserved: expression.trim().length > 0
+    || (transformActive && transformOperand.trim().length > 0)
+  readonly property int resultRowHeight: resultRowReserved ? Style.space(68) : 0
   readonly property int baseCardHeight: rowContentHeight + resultRowHeight + contentMargin * 2
   readonly property var displayHistory: CalcModel.filterHistory(history, historyQuery)
   readonly property int visibleHistoryRows: Math.min(5, displayHistory.length)
@@ -177,7 +179,7 @@ Item {
     ? Style.space(14) + Math.min(7, Math.max(1, actionItems.length)) * Style.space(42) + Style.space(26)
     : 0
   readonly property int helpExtraHeight: helpOpen ? Style.space(330) : 0
-  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(290) : 0
+  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(330) : 0
   readonly property int cardWidth: Math.min(Style.space(720), panel.width - Style.gapsOut * 2)
   readonly property int cardHeight: setupOpen ? Style.space(380) : baseCardHeight
     + Math.max(historyExtraHeight, detailExtraHeight, actionExtraHeight,
@@ -194,11 +196,13 @@ Item {
     { id: "history", label: "History", value: settings.historyMode === "persistent"
       ? "Persistent" : (settings.historyMode === "session" ? "This session" : "Off") },
     { id: "motion", label: "Motion", value: settings.reducedMotion ? "Reduced" : "Full" },
+    { id: "clock-format", label: "Time format", value: settings.clockFormat === "12"
+      ? "12-hour" : (settings.clockFormat === "24" ? "24-hour" : "System") },
     { id: "from-currency", label: "Default source currency", value: settings.defaultFromCurrency },
     { id: "to-currency", label: "Default target currency", value: settings.defaultToCurrency }
   ]
   readonly property var shortcutItems: [
-    { keys: "Enter", label: "Copy result and close" },
+    { keys: "Enter", label: transformActive ? "Replace selected text" : "Copy result and close" },
     { keys: "Ctrl+Enter", label: "Copy result and stay" },
     { keys: "Shift+Enter", label: transformActive ? "Replace selected text" : "Copy question and answer" },
     { keys: "Tab", label: "Use the answer as new input" },
@@ -210,6 +214,7 @@ Item {
   ]
   readonly property var opacityChoices: [1, 0.92, 0.8, 0.65, 0.5, 0.35]
   readonly property var historyChoices: ["persistent", "session", "disabled"]
+  readonly property var clockFormatChoices: ["12", "24", "auto"]
   readonly property var currencyChoices: [
     "USD", "CAD", "EUR", "GBP", "JPY", "AUD", "NZD", "CHF", "CNY", "INR"
   ]
@@ -349,8 +354,9 @@ Item {
       if (pythonChecked && !pythonAvailable) return "Enter to install Python"
       return "Enter to install calculator support"
     }
-    if (errorText) return CalcModel.singleLine(errorText)
+    if (errorText) return resultRowReserved ? "" : CalcModel.singleLine(errorText)
     if (clipboardChecked && !clipboardAvailable) return "Enter to install clipboard support"
+    if (resultRowReserved && statusText === "Calculating…") return ""
     return statusText || (!expression && !transformActive ? "Ctrl+? Help" : "")
   }
 
@@ -490,7 +496,9 @@ Item {
     root.result = ""
     root.clearResultMetadata()
     root.errorText = ""
-    root.statusText = root.transformToken ? "Reading selected text…" : ""
+    // Shortcut selection capture completes after the palette appears. Keep
+    // that probe silent so a no-selection launch feels like a normal launch.
+    root.statusText = ""
 
     if (root.transformToken) root.startTransformRead()
 
@@ -608,7 +616,7 @@ Item {
     root.transformReadOutput = ""
     if (!root.opened) return
     if (exitCode !== 0 || !payload.selection || !payload.windowAddress || !payload.windowPid) {
-      root.statusText = "No numeric selection found"
+      root.statusText = ""
       return
     }
     root.transformActive = true
@@ -884,7 +892,8 @@ Item {
     } else if (rawText && root.storageReady && !root.settingsMigrationWritten) {
       var parsed = ({})
       try { parsed = JSON.parse(rawText) } catch (error) { parsed = ({}) }
-      if (parsed.backgroundOpacity === undefined
+      if (parsed.version !== root.settings.version
+          || parsed.backgroundOpacity === undefined
           || parsed.historyRetentionDays === undefined
           || parsed.remPx === undefined
           || parsed.workdayHours === undefined
@@ -940,6 +949,9 @@ Item {
         root.settings.historyMode, delta) })
     } else if (item.id === "motion") {
       root.updateSettings({ reducedMotion: !root.settings.reducedMotion })
+    } else if (item.id === "clock-format") {
+      root.updateSettings({ clockFormat: CalcModel.wrappedChoice(root.clockFormatChoices,
+        root.settings.clockFormat, delta) })
     } else {
       var settingName = item.id === "from-currency" ? "defaultFromCurrency" : "defaultToCurrency"
       var otherName = item.id === "from-currency" ? "defaultToCurrency" : "defaultFromCurrency"
@@ -1202,7 +1214,8 @@ Item {
       } else {
         root.result = ""
         root.clearResultMetadata()
-        if (root.activeExitCode === 124) root.errorText = "Calculation timed out"
+        if (Boolean(payload.pending)) root.errorText = ""
+        else if (root.activeExitCode === 124) root.errorText = "Calculation timed out"
         else root.errorText = String(payload.error || nextError || "No result")
         root.statusText = ""
       }
@@ -1604,17 +1617,16 @@ Item {
       else root.moveHistorySelection(root.historyOpen ? -1 : 0)
       return true
     }
-    if (event.key === Qt.Key_Down
-        && (root.historyOpen || root.actionMenuOpen || root.preferencesOpen)) {
+    if (event.key === Qt.Key_Down) {
+      if (root.helpOpen) return true
       if (root.preferencesOpen)
         root.selectedPreferenceIndex = Math.min(root.preferenceItems.length - 1,
           root.selectedPreferenceIndex + 1)
       else if (root.actionMenuOpen) root.moveActionSelection(1)
-      else root.moveHistorySelection(1)
+      else root.moveHistorySelection(root.historyOpen ? 1 : 0)
       return true
     }
-    if (root.helpOpen && (event.key === Qt.Key_Down
-        || event.key === Qt.Key_Left || event.key === Qt.Key_Right)) return true
+    if (root.helpOpen && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) return true
     if (root.preferencesOpen && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
       root.adjustPreference(event.key === Qt.Key_Left ? -1 : 1)
       return true
@@ -1645,6 +1657,7 @@ Item {
       else if (shift && root.transformActive) root.submit("replace-selection")
       else if (shift) root.submit("copy-equation")
       else if (control) root.submit("copy-stay")
+      else if (root.transformActive) root.submit("replace-selection")
       else root.submit("")
       return true
     }
@@ -1663,7 +1676,7 @@ Item {
 
   Timer {
     id: evaluationTimer
-    interval: 80
+    interval: 200
     repeat: false
     onTriggered: root.startEvaluation()
   }
@@ -2303,9 +2316,9 @@ Item {
               id: copyResultHint
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
-              text: root.transformActive ? "⇧↵ Replace" : "↵ Copy"
+              text: root.transformActive ? "↵ Replace" : "↵ Copy"
               color: root.foreground
-              opacity: 0.46
+              opacity: root.result.length > 0 ? 0.46 : 0
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
             }
@@ -2333,13 +2346,17 @@ Item {
               anchors.right: rateMetadata.visible ? rateMetadata.left : copyResultHint.left
               anchors.rightMargin: Style.spacing.md
               anchors.verticalCenter: parent.verticalCenter
-              text: root.displayResult
-              color: root.accent
+              text: root.result.length > 0 ? root.displayResult
+                : (root.errorText.length > 0 ? CalcModel.singleLine(root.errorText) : "…")
+              color: root.errorText.length > 0 ? root.urgent
+                : (root.result.length > 0 ? root.accent : root.foreground)
+              opacity: root.result.length > 0 || root.errorText.length > 0 ? 1 : 0.36
               font.family: root.fontFamily
-              font.pixelSize: root.displayResult.length > 42
+              font.pixelSize: root.result.length === 0 ? Style.font.heading
+                : (root.displayResult.length > 42
                 ? Math.round(Style.font.heading * 1.15)
-                : Math.round(Style.font.heading * 1.5)
-              font.weight: Font.Bold
+                : Math.round(Style.font.heading * 1.5))
+              font.weight: root.result.length > 0 ? Font.Bold : Font.Normal
               horizontalAlignment: Text.AlignLeft
               elide: Text.ElideRight
             }
@@ -2494,7 +2511,8 @@ Item {
 
             MouseArea {
               anchors.fill: parent
-              cursorShape: Qt.PointingHandCursor
+              enabled: root.result.length > 0
+              cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
               onClicked: root.submit("copy-close")
             }
           }
@@ -2711,7 +2729,7 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             text: root.transformActive
-              ? "Alt+Enter collapse   Enter copy result   Shift+Enter replace selection"
+              ? "Alt+Enter collapse   Enter replace selection   Ctrl+Enter copy result"
               : "Alt+Enter collapse   Enter copy result   Shift+Enter copy equation"
             color: root.foreground
             opacity: 0.42

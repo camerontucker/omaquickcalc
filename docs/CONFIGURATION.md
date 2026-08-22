@@ -2,7 +2,7 @@
 
 OmaQuickCalc creates `$XDG_CONFIG_HOME/omaquickcalc/config.json`, falling back
 to `~/.config/omaquickcalc/config.json`. Press `Ctrl+,` in OmaQuickCalc to
-change card opacity, history mode, motion, and common default currency pairs.
+change card opacity, history mode, motion, time format, and common default currency pairs.
 Edit the JSON file for advanced values or any other ISO currency; changes
 reload live.
 
@@ -10,7 +10,7 @@ The generated defaults are:
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "historyMode": "persistent",
   "historyLimit": 100,
   "historyRetentionDays": 90,
@@ -22,7 +22,7 @@ The generated defaults are:
   "unicode": true,
   "digitGrouping": 0,
   "precision": 10,
-  "clockFormat": "auto",
+  "clockFormat": "12",
   "defaultFromCurrency": "USD",
   "defaultToCurrency": "CAD",
   "rateStaleDays": 7,
@@ -39,7 +39,7 @@ The generated defaults are:
 
 | Setting | Accepted values | Effect |
 | --- | --- | --- |
-| `version` | `2` | Current configuration schema. |
+| `version` | `3` | Current configuration schema. |
 | `historyMode` | `persistent`, `session`, `disabled` | Save history across launches, keep it only for this shell session, or record nothing. |
 | `historyLimit` | `1`–`1000` | Maximum number of retained entries. |
 | `historyRetentionDays` | `1`–`3650` | Age limit for unpinned persistent entries. |
@@ -51,7 +51,7 @@ The generated defaults are:
 | `unicode` | `true`, `false` | Allow Qalculate's Unicode result formatting. |
 | `digitGrouping` | `0`, `1`, `2` | Qalculate grouping: off, standard, or locale. |
 | `precision` | `2`–`50` | Significant digits requested from Qalculate. |
-| `clockFormat` | `auto`, `12`, `24` | Display format for times and timezone answers. |
+| `clockFormat` | `12`, `24`, `auto` | Display format for times and timezone answers; new installs default to 12-hour time. |
 | `defaultFromCurrency` | three-letter code | Source used when an expression contains only a target currency. |
 | `defaultToCurrency` | three-letter code | Target used when an expression contains only a source currency. |
 | `rateStaleDays` | `1`–`365` | Age after which cached exchange rates are marked stale. |
@@ -80,7 +80,7 @@ OmaQuickCalc respects XDG base directories:
 | Persistent history | `~/.local/share/omaquickcalc/history.json` | Retained by normal plugin removal. |
 | Launcher entry | `~/.local/share/applications/io.github.camerontucker.omaquickcalc.desktop` | Removed by `uninstall.sh` only when marked as OmaQuickCalc-managed. |
 | Optional shortcut | marked block in `~/.config/hypr/bindings.lua` | Removed by `uninstall.sh`; unrelated content is preserved. |
-| Transform handoff | `$XDG_RUNTIME_DIR/omaquickcalc/transform` | Private single-use selection state; consumed immediately and stale after one minute. |
+| Transform handoff | `$XDG_RUNTIME_DIR/omaquickcalc/transform` | Private single-use selection state; completed asynchronously after the palette appears and stale after one minute. |
 
 To reopen shortcut setup without changing calculator preferences:
 

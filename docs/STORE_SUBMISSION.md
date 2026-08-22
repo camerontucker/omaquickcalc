@@ -37,7 +37,7 @@ calculator
 
 ### Maintainer notes
 
-OmaQuickCalc is a keyboard-first modal calculator for Omarchy Quattro with Transform in Place: highlight `100 CAD` in any application, summon one floating input, type `in USD`, and press Shift+Enter to replace the selection with `$72.61`. Enter still copies normally. The same universal workflow handles percentages, units, design values, and local-time shorthand while preserving the dead-simple single-input interface and active Omarchy theme.
+OmaQuickCalc is a keyboard-first modal calculator for Omarchy Quattro with Transform in Place: highlight `100 CAD` in any application, summon one floating input, type `in USD`, and press Enter to replace the selection with `$72.61`. Normal calculator launches still use Enter to copy; Ctrl+Enter copies during a transform. The same universal workflow handles percentages, units, design values, and local-time shorthand while preserving the dead-simple single-input interface and active Omarchy theme.
 
 The launch experience is complete for normal marketplace installation even though lifecycle hooks are not executed. The enabled overlay creates its owned Super + Space launcher entry on load and presents optional first-run shortcut setup. A user can replace Omacalc's Super+Ctrl+Q binding, choose a conflict-checked alternative, or skip. The approved shortcut explicitly enables numeric selection capture; normal launcher opens never read the clipboard. No user configuration is changed without confirmation, and the plugin manages only its marked block, validates Hyprland, and rolls back rejected changes.
 

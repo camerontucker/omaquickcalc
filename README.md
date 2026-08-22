@@ -43,7 +43,7 @@ Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
 ## Transform in Place
 
 Highlight `100 CAD`, summon OmaQuickCalc, and type `in USD`. Press `Enter` to
-copy `$72.61`, or `Shift+Enter` to replace the original selection.
+replace the original selection with `$72.61`, or `Ctrl+Enter` to copy instead.
 
 **1. Select the value**
 

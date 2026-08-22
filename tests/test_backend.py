@@ -16,6 +16,7 @@ class NaturalLanguageTests(unittest.TestCase):
             "18% tip on 80": "(80) * (1 + 18%)",
             "10k usd in gbp": "10000 USD to GBP",
             "$2.5m in cad": "2500000 USD to CAD",
+            "500 * 0.5 in usd": "(500 * 0.5) USD to USD",
         }
         for phrase, expected in cases.items():
             with self.subTest(phrase=phrase):
@@ -65,6 +66,25 @@ class NaturalLanguageTests(unittest.TestCase):
         self.assertEqual(result.result, "$1,234.57")
         self.assertEqual(result.rawResult, "1234.565")
 
+    @patch("omaquickcalc_backend.subprocess.run")
+    def test_symbol_led_dollar_conversion_keeps_symbol_and_target_code(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, "CAD 142.195\n", "")
+        result = backend.evaluate("$100 in CAD")
+        self.assertEqual(result.result, "CAD $142.20")
+        self.assertEqual(result.rawResult, "142.195")
+
+    @patch("omaquickcalc_backend.subprocess.run")
+    def test_arithmetic_is_evaluated_before_currency_formatting(self, run):
+        run.return_value = subprocess.CompletedProcess([], 0, "$250\n", "")
+        result = backend.evaluate("500 * 0.5 in usd")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.result, "$250.00")
+        self.assertEqual(result.rawResult, "250")
+        self.assertEqual(result.normalizedExpression, "(500 * 0.5) USD to USD")
+        self.assertFalse(result.dynamic)
+        self.assertEqual(result.swapExpression, "")
+        self.assertEqual(result.rateDate, "")
+
 
 class StructuredEvaluatorTests(unittest.TestCase):
     @patch("omaquickcalc_backend.subprocess.run")
@@ -89,8 +109,22 @@ class StructuredEvaluatorTests(unittest.TestCase):
 
     def test_design_and_duration_calculations(self):
         self.assertEqual(backend.evaluate("64px in rem").result, "4 rem")
+        self.assertEqual(backend.evaluate("50rem").result, "800 px")
+        self.assertEqual(backend.evaluate("1000px").result, "62.5 rem")
+        self.assertEqual(backend.evaluate("10cm").result, "3.937007874 in")
+        self.assertEqual(backend.evaluate("10in").result, "25.4 cm")
         self.assertEqual(backend.evaluate("90 mins to timespan").result, "1 hour 30 minutes")
         self.assertEqual(backend.evaluate("16 h in workdays").result, "2 workdays")
+
+    @patch("omaquickcalc_backend.subprocess.run")
+    def test_incomplete_or_arbitrary_text_does_not_leak_qalculate_constants(self, run):
+        for expression in ("50r", "50re", "10c", "10i", "quatt", "hello world"):
+            with self.subTest(expression=expression):
+                result = backend.evaluate(expression)
+                self.assertFalse(result.ok)
+                self.assertTrue(result.pending)
+                self.assertEqual(result.error, "")
+        run.assert_not_called()
 
     def test_natural_date_addition(self):
         result = backend.evaluate("March 4, 2030 + 45 days")
@@ -115,6 +149,8 @@ class StructuredEvaluatorTests(unittest.TestCase):
         value = backend.datetime(2030, 1, 2, 17, 5, tzinfo=backend.timezone.utc)
         self.assertEqual(backend.format_clock(value, "12"), "5:05 PM")
         self.assertEqual(backend.format_clock(value, "24"), "17:05")
+        self.assertEqual(backend.format_clock(value, "12"),
+                         backend.format_clock(value, backend.DEFAULT_CLOCK_FORMAT))
 
     def test_timezone_shorthand_converts_to_local_time(self):
         target = backend.ZoneInfo("America/Winnipeg")
@@ -135,7 +171,7 @@ class StructuredEvaluatorTests(unittest.TestCase):
 
     def test_timezone_conversion_only_includes_date_across_day_boundary(self):
         same_day = backend.evaluate("1pm Vancouver in Winnipeg", clock_format="12")
-        self.assertRegex(same_day.result, r"^3:00 PM · C[DS]T$")
+        self.assertRegex(same_day.result, r"^3:00 PM C[DS]T$")
 
         next_day = backend.evaluate("5pm London in Tokyo", clock_format="12")
         self.assertRegex(next_day.result, r"^[12]:00 AM · .+ · JST$")

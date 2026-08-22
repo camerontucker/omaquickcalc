@@ -39,6 +39,7 @@ class Evaluation:
     rateAgeDays: int = -1
     rateStale: bool = False
     note: str = ""
+    pending: bool = False
 
 
 EASTER_EGGS = {
@@ -49,6 +50,8 @@ EASTER_EGGS = {
     "ramanujan": ("1729", "1³ + 12³ = 9³ + 10³"),
     "dhh": ("37", "Convention over configuration."),
 }
+
+DEFAULT_CLOCK_FORMAT = "12"
 
 
 ZONE_ALIASES = {
@@ -120,6 +123,8 @@ CURRENCY_CODES = {
     "NZD", "PHP", "PLN", "RON", "SEK", "SGD", "THB", "TRY", "USD", "ZAR",
     "BTC", "ETH",
 }
+DOLLAR_CURRENCIES = {"AUD", "CAD", "HKD", "NZD", "SGD", "USD"}
+BARE_MATH_CONSTANTS = {"e", "pi", "phi", "tau"}
 CURRENCY_ALIASES = {
     "a$": "AUD", "aussie": "AUD", "australian": "AUD",
     "real": "BRL", "reais": "BRL", "brazilian": "BRL",
@@ -213,11 +218,11 @@ def format_datetime(value: datetime, clock_format: str = "auto") -> str:
 
 def format_timezone_conversion(source: datetime, target: datetime,
                                clock_format: str = "auto") -> str:
-    parts = [format_clock(target, clock_format)]
-    if source.date() != target.date():
-        parts.append(target.strftime("%a, %b %-d"))
-    parts.append(target.strftime("%Z"))
-    return " · ".join(parts)
+    clock = format_clock(target, clock_format)
+    zone = target.strftime("%Z")
+    if source.date() == target.date():
+        return f"{clock} {zone}"
+    return f"{clock} · {target.strftime('%a, %b %-d')} · {zone}"
 
 
 def parse_clock(value: str) -> time | None:
@@ -360,6 +365,41 @@ def date_evaluation(expression: str, clock_format: str = "auto") -> Evaluation |
 
 def design_evaluation(expression: str, rem_px: float, workday_hours: float) -> Evaluation | None:
     text = expression.strip()
+
+    # Bare design units are intentionally opinionated. Qalculate otherwise
+    # interprets `rem` as radiation dose and short partial suffixes as
+    # scientific constants, which is surprising in a live design calculator.
+    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*rem", text, re.I)
+    if match:
+        rem = float(match.group(1))
+        pixels = rem * rem_px
+        return Evaluation(True, f"{format_number(pixels)} px", format_number(pixels),
+                          kind="design",
+                          swapExpression=f"{format_number(pixels)} px in rem")
+
+    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*px", text, re.I)
+    if match:
+        pixels = float(match.group(1))
+        rem = pixels / rem_px
+        return Evaluation(True, f"{format_number(rem)} rem", format_number(rem),
+                          kind="design",
+                          swapExpression=f"{format_number(rem)} rem in px")
+
+    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*cm", text, re.I)
+    if match:
+        centimeters = float(match.group(1))
+        inches = centimeters / 2.54
+        return Evaluation(True, f"{format_number(inches)} in", format_number(inches),
+                          kind="unit",
+                          swapExpression=f"{format_number(inches)} in to cm")
+
+    match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*(?:in|inch|inches)", text, re.I)
+    if match:
+        inches = float(match.group(1))
+        centimeters = inches * 2.54
+        return Evaluation(True, f"{format_number(centimeters)} cm", format_number(centimeters),
+                          kind="unit",
+                          swapExpression=f"{format_number(centimeters)} cm to in")
 
     match = re.fullmatch(r"([+-]?\d+(?:\.\d+)?)\s*(?:in|inch|inches)\s+in\s+px(?:\s+at\s+([+-]?\d+(?:\.\d+)?)\s*ppi)?", text, re.I)
     if match:
@@ -621,6 +661,12 @@ def normalize_currency_query(expression: str, default_from: str, default_to: str
     if right:
         _, target_text = split_currency_amount(right)
         target = resolve_currency(target_text or right)
+    if (target and not source and source_text
+            and re.fullmatch(r"[\d\s.,_+'()*/%^+-]+", left)):
+        # `500 * 0.5 in USD` means calculate first, then format the result as
+        # USD. Attaching and converting the same currency prevents Qalculate
+        # from converting the amount to its configured local currency.
+        return f"({left}) {target} to {target}"
     if not source and not target:
         return ""
     if right and not target:
@@ -699,7 +745,19 @@ def plain_result(value: str, kind: str) -> str:
     return result
 
 
-def currency_result(value: str, raw: str) -> str:
+def symbol_led_dollar_target(original: str, normalized: str) -> str:
+    separator = re.search(
+        r"\s*(?:->|=>|→|>)\s*|\s+\b(?:to|in|into|as)\b\s+", original, re.I
+    )
+    source_text = original if separator is None else original[:separator.start()]
+    if "$" not in source_text:
+        return ""
+    match = re.search(r"\bto\s+([A-Z]{3})\s*$", normalized, re.I)
+    target = match.group(1).upper() if match else ""
+    return target if target in DOLLAR_CURRENCIES else ""
+
+
+def currency_result(value: str, raw: str, original: str = "", normalized: str = "") -> str:
     """Round the primary money result while retaining raw calculator precision."""
     match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?(?:[Ee][-+]?\d+)?", value)
     if not match:
@@ -708,6 +766,11 @@ def currency_result(value: str, raw: str) -> str:
         amount = Decimal(raw).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except InvalidOperation:
         return value
+
+    dollar_target = symbol_led_dollar_target(original, normalized)
+    if dollar_target:
+        sign = "-" if amount < 0 else ""
+        return f"{dollar_target} {sign}${abs(amount):,.2f}"
 
     prefix = value[:match.start()]
     suffix = value[match.end():]
@@ -801,7 +864,8 @@ def rate_metadata(stale_days: int) -> tuple[str, str, int, bool]:
 def infer_kind(expression: str) -> tuple[str, bool]:
     tokens = {token.upper() for token in re.findall(r"\b[A-Za-z]{3}\b", expression)}
     if tokens.intersection(CURRENCY_CODES) and re.search(r"\bto\b", expression, re.I):
-        return "currency", True
+        conversion = re.search(r"\b([A-Z]{3})\s+to\s+([A-Z]{3})\b", expression, re.I)
+        return "currency", not conversion or conversion.group(1).upper() != conversion.group(2).upper()
     if re.search(r"\b(?:now|today|tomorrow)\b", expression, re.I):
         return "date", True
     if re.search(r"\bto\b", expression, re.I):
@@ -814,6 +878,8 @@ def conversion_swap(expression: str, result: str, raw: str, kind: str) -> str:
     if not match:
         return ""
     source, target = match.group(2), match.group(3)
+    if source.upper() == target.upper():
+        return ""
     if kind == "currency":
         numeric = raw
     else:
@@ -840,6 +906,11 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
     normalized = normalize_natural_language(expression, default_from, default_to)
     if suspicious_result(expression, normalized, ""):
         return Evaluation(False, error="Unsupported natural-language calculation", normalizedExpression=normalized)
+    if (re.fullmatch(r"[+-]?\d+(?:\.\d+)?\s*[A-Za-z°µμ]{1,12}", normalized)
+            or (re.fullmatch(r"[A-Za-z][A-Za-z\s]*", normalized)
+                and normalized.strip().lower() not in BARE_MATH_CONSTANTS)):
+        return Evaluation(False, pending=True,
+                          normalizedExpression=normalized)
 
     command = [
         qalc, "--terse", "--time", str(timeout_ms), "+u8" if unicode_output else "-u8",
@@ -869,10 +940,10 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
         output = output[1:-1]
     kind, dynamic = infer_kind(normalized)
     raw = plain_result(output, kind)
-    display = currency_result(output, raw) if kind == "currency" else output
+    display = currency_result(output, raw, expression, normalized) if kind == "currency" else output
     formats = numeric_formats(raw, precision) if kind == "math" else []
     rate_date, rate_source, rate_age, rate_stale = ("", "", -1, False)
-    if kind == "currency":
+    if kind == "currency" and dynamic:
         rate_date, rate_source, rate_age, rate_stale = rate_metadata(rate_stale_days)
     return Evaluation(True, display, raw, kind=kind, normalizedExpression=normalized,
                       swapExpression=conversion_swap(normalized, display, raw, kind), dynamic=dynamic,
@@ -883,7 +954,7 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
 def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
              unicode_output: bool = True, digit_grouping: int = 0,
              rem_px: float = 16, workday_hours: float = 8,
-             clock_format: str = "auto", precision: int = 10,
+             clock_format: str = DEFAULT_CLOCK_FORMAT, precision: int = 10,
              default_from: str = "USD", default_to: str = "CAD",
              rate_stale_days: int = 7) -> Evaluation:
     text = expression.strip()
@@ -922,7 +993,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--digit-grouping", type=int, choices=(0, 1, 2), default=0)
     parser.add_argument("--rem-px", type=float, default=16)
     parser.add_argument("--workday-hours", type=float, default=8)
-    parser.add_argument("--clock-format", choices=("auto", "12", "24"), default="auto")
+    parser.add_argument("--clock-format", choices=("auto", "12", "24"),
+                        default=DEFAULT_CLOCK_FORMAT)
     parser.add_argument("--precision", type=int, default=10)
     parser.add_argument("--default-from", default="USD")
     parser.add_argument("--default-to", default="CAD")

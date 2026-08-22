@@ -42,7 +42,7 @@ class EvaluationLatencyTests(unittest.TestCase):
                 self.assertLess(
                     median, 0.25,
                     f"{expression!r} backend median {median * 1000:.1f}ms exceeds "
-                    "the 250ms release budget before the 80ms UI debounce",
+                    "the 250ms release budget before the 200ms UI debounce",
                 )
 
 

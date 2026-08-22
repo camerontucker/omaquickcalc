@@ -36,6 +36,18 @@ TestCase {
     compare(updated.defaultFromCurrency, "USD")
   }
 
+  function test_time_format_defaults_to_12_hour_and_remains_configurable() {
+    compare(Model.parseSettings("{}").clockFormat, "12")
+    compare(Model.parseSettings(JSON.stringify({ version: 2, clockFormat: "auto" })).clockFormat,
+      "12")
+    compare(Model.parseSettings(JSON.stringify({ version: 3, clockFormat: "auto" })).clockFormat,
+      "auto")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { clockFormat: "24" }).clockFormat,
+      "24")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { clockFormat: "auto" }).clockFormat,
+      "auto")
+  }
+
   function test_choice_navigation_wraps() {
     var choices = ["first", "second", "third"]
     compare(Model.wrappedChoice(choices, "first", -1), "third")

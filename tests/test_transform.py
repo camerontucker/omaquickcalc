@@ -33,6 +33,15 @@ class TransformStateTests(unittest.TestCase):
                 })
                 self.assertFalse(path.exists())
 
+    def test_pending_state_waits_for_capture_without_blocking_summon(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(os.environ, {"XDG_RUNTIME_DIR": directory}):
+                token = transform.write_pending_state(
+                    {"address": "0x123abc", "pid": 4242}, False
+                )
+                transform.complete_pending_state(token, "100 CAD")
+                self.assertEqual(transform.consume_state(token)["selection"], "100 CAD")
+
     def test_invalid_token_cannot_escape_runtime_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             with patch.dict(os.environ, {"XDG_RUNTIME_DIR": directory}):
@@ -92,10 +101,14 @@ class TransformWorkflowTests(unittest.TestCase):
                 with patch("omaquickcalc_transform.active_window", return_value={
                     "address": "0xabc", "pid": 4242, "tags": []
                 }):
-                    with patch("omaquickcalc_transform.capture_selection", return_value="64px"):
+                    events = []
+                    with patch("omaquickcalc_transform.capture_selection",
+                               side_effect=lambda *_args: events.append("capture") or "64px"):
                         with patch("omaquickcalc_transform.summon", return_value=0) as summon:
+                            summon.side_effect = lambda *_args: events.append("summon") or 0
                             status = transform.capture_and_summon(PLUGIN_ID)
                 self.assertEqual(status, 0)
+                self.assertEqual(events, ["summon", "capture"])
                 token = summon.call_args.args[1]
                 self.assertTrue(transform.state_path(token).exists())
                 self.assertEqual(transform.consume_state(token)["selection"], "64px")

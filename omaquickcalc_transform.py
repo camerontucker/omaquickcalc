@@ -19,6 +19,7 @@ from pathlib import Path
 MAX_SELECTION_LENGTH = 512
 MAX_RESULT_LENGTH = 65_536
 STATE_MAX_AGE_SECONDS = 60
+PENDING_WAIT_SECONDS = 1.5
 TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 WINDOW_PATTERN = re.compile(r"^0x[0-9a-fA-F]+$")
 
@@ -218,19 +219,77 @@ def write_state(selection: str, window: dict[str, object], terminal: bool) -> st
     return token
 
 
+def write_pending_state(window: dict[str, object], terminal: bool) -> str:
+    """Create a private handoff before the overlay is summoned."""
+    cleanup_stale_state()
+    window_address = str(window.get("address", ""))
+    window_pid = int(window.get("pid", 0) or 0)
+    if not WINDOW_PATTERN.fullmatch(window_address) or window_pid <= 0:
+        raise ValueError("Invalid transform origin window")
+    token = secrets.token_hex(16)
+    path = state_path(token)
+    descriptor = os.open(
+        path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600
+    )
+    payload = {
+        "pending": True,
+        "selection": "",
+        "windowAddress": window_address,
+        "windowPid": window_pid,
+        "terminal": terminal,
+    }
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+    return token
+
+
+def complete_pending_state(token: str, selection: str) -> None:
+    """Atomically publish selection capture to the waiting overlay."""
+    path = state_path(token)
+    metadata = path.lstat()
+    if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid()
+            or metadata.st_mode & 0o077):
+        raise RuntimeError("Unsafe transform state")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["pending"] = False
+    payload["selection"] = normalize_selection(selection)
+    temporary = path.with_name(f".{path.name}.{secrets.token_hex(8)}")
+    descriptor = os.open(
+        temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600
+    )
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, ensure_ascii=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+
 def consume_state(token: str) -> dict[str, object]:
     path = state_path(token)
+    deadline = time.monotonic() + PENDING_WAIT_SECONDS
     try:
-        metadata = path.lstat()
-        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid()
-                or metadata.st_mode & 0o077):
-            raise RuntimeError("Unsafe transform state")
-        if metadata.st_mtime < time.time() - STATE_MAX_AGE_SECONDS:
-            raise RuntimeError("Transform state expired")
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(payload, dict):
-            raise ValueError("Invalid transform state")
-        return payload
+        while True:
+            metadata = path.lstat()
+            if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid()
+                    or metadata.st_mode & 0o077):
+                raise RuntimeError("Unsafe transform state")
+            if metadata.st_mtime < time.time() - STATE_MAX_AGE_SECONDS:
+                raise RuntimeError("Transform state expired")
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("Invalid transform state")
+            if not payload.get("pending"):
+                return payload
+            if time.monotonic() >= deadline:
+                payload["pending"] = False
+                return payload
+            time.sleep(0.02)
     finally:
         try:
             path.unlink()
@@ -251,14 +310,21 @@ def capture_and_summon(plugin_id: str) -> int:
     window = active_window()
     terminal = is_terminal_window(window)
     window_address = str(window.get("address", ""))
-    selection = capture_selection(terminal, window_address)
-    token = write_state(selection, window, terminal) if selection else ""
+    token = write_pending_state(window, terminal)
     status = summon(plugin_id, token)
-    if status != 0 and token:
+    if status != 0:
         try:
             state_path(token).unlink()
         except FileNotFoundError:
             pass
+        return status
+    selection = capture_selection(terminal, window_address)
+    try:
+        complete_pending_state(token, selection)
+    except FileNotFoundError:
+        # The overlay may have timed out or been dismissed while capture was
+        # still in flight; there is no longer any private state to publish.
+        pass
     return status
 
 

@@ -21,6 +21,9 @@ releases are not maintained separately while the plugin is pre-1.0.
   keyboard shortcut explicitly captures only short text containing a number,
   restores the previous clipboard immediately, and transfers the selection
   through a mode-0600 single-use file under `$XDG_RUNTIME_DIR`.
+- The shortcut summons the palette before targeted capture completes. Its
+  pending handoff contains only the validated origin window, remains private,
+  and is atomically completed or expires without enabling replacement.
 - The previous clipboard representation exists only in the capture helper's
   memory until restoration. If its format cannot be restored safely, capture
   aborts without changing it.

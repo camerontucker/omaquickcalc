@@ -1,7 +1,7 @@
 .pragma library
 
 var defaults = {
-  version: 2,
+  version: 3,
   historyMode: "persistent",
   historyLimit: 100,
   historyRetentionDays: 90,
@@ -13,7 +13,7 @@ var defaults = {
   unicode: true,
   digitGrouping: 0,
   precision: 10,
-  clockFormat: "auto",
+  clockFormat: "12",
   defaultFromCurrency: "USD",
   defaultToCurrency: "CAD",
   rateStaleDays: 7,
@@ -54,6 +54,11 @@ function parseSettings(raw) {
   var clockFormat = String(parsed.clockFormat || defaults.clockFormat)
   if (["auto", "12", "24"].indexOf(clockFormat) < 0)
     clockFormat = defaults.clockFormat
+  // Version 2 generated `auto`, which follows a 24-hour system locale on many
+  // Omarchy installs. Version 3 adopts the requested 12-hour default while
+  // preserving explicit choices made after migration.
+  if (Number(parsed.version) === 2 && clockFormat === "auto")
+    clockFormat = defaults.clockFormat
 
   var fromCurrency = String(parsed.defaultFromCurrency || defaults.defaultFromCurrency).toUpperCase()
   var toCurrency = String(parsed.defaultToCurrency || defaults.defaultToCurrency).toUpperCase()
@@ -61,7 +66,7 @@ function parseSettings(raw) {
   if (!/^[A-Z]{3}$/.test(toCurrency)) toCurrency = defaults.defaultToCurrency
 
   return {
-    version: 2,
+    version: 3,
     historyMode: mode,
     historyLimit: boundedInteger(parsed.historyLimit, defaults.historyLimit, 1, 1000),
     historyRetentionDays: boundedInteger(parsed.historyRetentionDays,
