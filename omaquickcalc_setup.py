@@ -7,10 +7,14 @@ import argparse
 import json
 import os
 import re
+import selectors
 import shlex
+import stat
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
+from time import monotonic
 
 
 DESKTOP_MARKER = "X-OmaQuickCalc-Managed=true"
@@ -32,6 +36,103 @@ ALLOWED_KEYS = {
     "MINUS",
     "EQUAL",
 }
+KEYBINDING_COMMAND = ["omarchy", "menu", "keybindings", "--print"]
+MAX_KEYBINDING_OUTPUT_BYTES = 256 * 1024
+MAX_HYPRCTL_OUTPUT_BYTES = 64 * 1024
+MAX_SETUP_ERROR_BYTES = 16 * 1024
+MAX_SETUP_FILE_BYTES = 1024 * 1024
+MAX_SETUP_JSON_BYTES = 128 * 1024
+
+
+class SetupOutputTooLarge(RuntimeError):
+    """A setup subprocess exceeded a captured-stream byte ceiling."""
+
+
+class SetupFileTooLarge(RuntimeError):
+    """A mutable setup file exceeded its byte ceiling."""
+
+
+def _run_bounded(
+    command: list[str], *, timeout: float = 10,
+    stdout_limit: int, stderr_limit: int,
+) -> subprocess.CompletedProcess[str]:
+    """Run direct argv while concurrently bounding both captured streams."""
+    process = subprocess.Popen(
+        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ, (bytearray(), stdout_limit))
+    selector.register(process.stderr, selectors.EVENT_READ, (bytearray(), stderr_limit))
+    buffers = {
+        process.stdout: selector.get_key(process.stdout).data[0],
+        process.stderr: selector.get_key(process.stderr).data[0],
+    }
+    deadline = monotonic() + timeout
+
+    try:
+        while selector.get_map():
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            events = selector.select(remaining)
+            if not events:
+                raise subprocess.TimeoutExpired(command, timeout)
+            for key, _ in events:
+                stream = key.fileobj
+                buffer, byte_limit = key.data
+                chunk = os.read(stream.fileno(), min(65_536, byte_limit - len(buffer) + 1))
+                if not chunk:
+                    selector.unregister(stream)
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > byte_limit:
+                    raise SetupOutputTooLarge("Setup command output exceeded its byte limit")
+
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, timeout)
+        return_code = process.wait(timeout=remaining)
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        raise
+    finally:
+        selector.close()
+        process.stdout.close()
+        process.stderr.close()
+
+    return subprocess.CompletedProcess(
+        command,
+        return_code,
+        buffers[process.stdout].decode("utf-8", errors="replace"),
+        buffers[process.stderr].decode("utf-8", errors="replace"),
+    )
+
+
+def _read_setup_file(path: Path) -> tuple[str, int]:
+    """Read a regular mutable setup file without accepting oversized state."""
+    descriptor: int | None = os.open(
+        path, os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError("Setup path is not a regular file")
+        if metadata.st_size > MAX_SETUP_FILE_BYTES:
+            raise SetupFileTooLarge("Setup file exceeds its byte limit")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            content = stream.read(MAX_SETUP_FILE_BYTES + 1)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if len(content) > MAX_SETUP_FILE_BYTES:
+        raise SetupFileTooLarge("Setup file exceeds its byte limit")
+    return content.decode("utf-8", errors="strict"), metadata.st_mode & 0o777
 
 
 def config_home() -> Path:
@@ -82,12 +183,10 @@ def parse_keybindings(raw: str) -> dict[str, str]:
 
 
 def current_keybindings() -> dict[str, str]:
-    completed = subprocess.run(
-        ["omarchy", "menu", "keybindings", "--print"],
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=10,
+    completed = _run_bounded(
+        KEYBINDING_COMMAND,
+        stdout_limit=MAX_KEYBINDING_OUTPUT_BYTES,
+        stderr_limit=MAX_SETUP_ERROR_BYTES,
     )
     if completed.returncode != 0:
         raise RuntimeError(
@@ -158,7 +257,7 @@ def atomic_write(path: Path, content: str, mode: int | None = None) -> None:
 def ensure_launcher(path: Path, plugin_id: str, version: str) -> dict[str, object]:
     action = "created"
     if path.exists():
-        current = path.read_text(encoding="utf-8")
+        current, _ = _read_setup_file(path)
         if DESKTOP_MARKER not in current:
             return {"ok": False, "action": "conflict", "path": str(path)}
         action = "unchanged" if current == desktop_contents(plugin_id, version) else "updated"
@@ -198,13 +297,17 @@ def render_bindings(content: str, shortcut: str, plugin_id: str) -> str:
 
 
 def hyprland_reload() -> tuple[bool, str]:
-    reload_result = subprocess.run(
-        ["hyprctl", "reload"], check=False, capture_output=True, text=True, timeout=10
+    reload_result = _run_bounded(
+        ["hyprctl", "reload"],
+        stdout_limit=MAX_HYPRCTL_OUTPUT_BYTES,
+        stderr_limit=MAX_SETUP_ERROR_BYTES,
     )
     if reload_result.returncode != 0:
         return False, (reload_result.stderr or reload_result.stdout).strip()
-    errors = subprocess.run(
-        ["hyprctl", "configerrors"], check=False, capture_output=True, text=True, timeout=10
+    errors = _run_bounded(
+        ["hyprctl", "configerrors"],
+        stdout_limit=MAX_HYPRCTL_OUTPUT_BYTES,
+        stderr_limit=MAX_SETUP_ERROR_BYTES,
     )
     error_text = (errors.stdout or errors.stderr).strip()
     return errors.returncode == 0 and not error_text, error_text
@@ -215,8 +318,7 @@ def apply_shortcut(
 ) -> dict[str, object]:
     shortcut = canonical_shortcut(shortcut)
     existed = path.exists()
-    previous = path.read_text(encoding="utf-8") if existed else ""
-    previous_mode = path.stat().st_mode & 0o777 if existed else 0o644
+    previous, previous_mode = _read_setup_file(path) if existed else ("", 0o644)
     updated = render_bindings(previous, shortcut, plugin_id)
     atomic_write(path, updated, previous_mode)
     if reload_hyprland:
@@ -227,7 +329,8 @@ def apply_shortcut(
             elif path.exists():
                 path.unlink()
             subprocess.run(
-                ["hyprctl", "reload"], check=False, capture_output=True, text=True, timeout=10
+                ["hyprctl", "reload"], check=False,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10
             )
             return {"ok": False, "error": detail or "Hyprland rejected the binding"}
     return {"ok": True, "shortcut": shortcut, "path": str(path)}
@@ -244,11 +347,11 @@ def cleanup(
     previous_binding = ""
     previous_mode = 0o644
     if bindings.exists():
-        current = bindings.read_text(encoding="utf-8")
+        current, current_mode = _read_setup_file(bindings)
         updated = without_managed_block(current)
         if updated != current:
             previous_binding = current
-            previous_mode = bindings.stat().st_mode & 0o777
+            previous_mode = current_mode
             atomic_write(bindings, updated, previous_mode)
             removed.append("managed shortcut")
             binding_changed = True
@@ -258,7 +361,8 @@ def cleanup(
         if not valid:
             atomic_write(bindings, previous_binding, previous_mode)
             subprocess.run(
-                ["hyprctl", "reload"], check=False, capture_output=True, text=True, timeout=10
+                ["hyprctl", "reload"], check=False,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10
             )
             return {
                 "ok": False,
@@ -268,14 +372,18 @@ def cleanup(
 
     for owned_desktop in (desktop, *legacy_desktops):
         if (owned_desktop.exists()
-                and DESKTOP_MARKER in owned_desktop.read_text(encoding="utf-8")):
+                and DESKTOP_MARKER in _read_setup_file(owned_desktop)[0]):
             owned_desktop.unlink()
             removed.append(str(owned_desktop))
     return {"ok": True, "removed": removed}
 
 
 def output(payload: dict[str, object]) -> int:
-    print(json.dumps(payload, separators=(",", ":")))
+    encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    if len(encoded) > MAX_SETUP_JSON_BYTES:
+        payload = {"ok": False, "error": "Setup response exceeded its byte limit"}
+        encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    sys.stdout.buffer.write(encoded + b"\n")
     return 0 if payload.get("ok", True) else 1
 
 

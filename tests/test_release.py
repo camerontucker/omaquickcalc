@@ -189,6 +189,19 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertIn("preload: false", view)
         self.assertIn("stream.read(byte_limit + 1)", state_helper)
 
+        detail = qml.split("id: detailText", 1)[1].split("\n            }", 1)[0]
+        self.assertIn("textFormat: TextEdit.PlainText", detail)
+
+    def test_rate_cache_and_setup_transport_are_bounded(self):
+        backend = (REPOSITORY / "omaquickcalc_backend.py").read_text(encoding="utf-8")
+        setup = (REPOSITORY / "omaquickcalc_setup.py").read_text(encoding="utf-8")
+        self.assertIn("def _read_rate_cache(", backend)
+        self.assertNotIn('read_text(encoding="utf-8", errors="replace")[:200_000]', backend)
+        self.assertIn("def _run_bounded(", setup)
+        self.assertIn("MAX_SETUP_JSON_BYTES", setup)
+        self.assertNotIn("capture_output=True", setup)
+        self.assertNotIn(".read_text(", setup)
+
     def test_transform_in_place_contract(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         setup = (REPOSITORY / "omaquickcalc_setup.py").read_text(encoding="utf-8")

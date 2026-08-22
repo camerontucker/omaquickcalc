@@ -12,6 +12,7 @@ import os
 import re
 import resource
 import selectors
+import stat
 import subprocess
 import sys
 import unicodedata
@@ -70,10 +71,15 @@ MAX_INTEGER_FORMAT_DECIMAL_EXPONENT = 1000
 MAX_FRACTION_DIGITS = 512
 MAX_EVALUATION_JSON_BYTES = 128 * 1024
 MAX_BATCH_JSON_BYTES = 512 * 1024
+MAX_RATE_CACHE_BYTES = 200_000
 
 
 class QalcOutputLimitError(RuntimeError):
     """Raised after terminating qalc for exceeding a captured-stream limit."""
+
+
+class RateCacheTooLarge(ValueError):
+    """Raised when mutable Qalculate metadata exceeds its byte ceiling."""
 
 
 def _limit_qalc_address_space() -> None:
@@ -145,6 +151,28 @@ def _run_qalc_bounded(command: list[str], timeout: float) -> subprocess.Complete
         buffers[process.stdout].decode("utf-8", errors="replace"),
         buffers[process.stderr].decode("utf-8", errors="replace"),
     )
+
+
+def _read_rate_cache(path: Path) -> str:
+    """Read a regular Qalculate cache file without materializing oversized input."""
+    descriptor: int | None = os.open(
+        path, os.O_RDONLY | os.O_CLOEXEC | os.O_NONBLOCK
+    )
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OSError("Qalculate cache path is not a regular file")
+        if metadata.st_size > MAX_RATE_CACHE_BYTES:
+            raise RateCacheTooLarge("Qalculate cache exceeds its byte limit")
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None
+            content = stream.read(MAX_RATE_CACHE_BYTES + 1)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    if len(content) > MAX_RATE_CACHE_BYTES:
+        raise RateCacheTooLarge("Qalculate cache exceeds its byte limit")
+    return content.decode("utf-8", errors="replace")
 
 
 ZONE_ALIASES = {
@@ -949,7 +977,7 @@ def rate_metadata(stale_days: int) -> tuple[str, str, int, bool]:
                 continue
             seen.add(path)
             try:
-                content = path.read_text(encoding="utf-8", errors="replace")[:200_000]
+                content = _read_rate_cache(path)
                 if filename == "rates.json":
                     match = re.search(r'"date"\s*:\s*"(\d{4}-\d{2}-\d{2})"', content)
                 else:

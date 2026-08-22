@@ -3,6 +3,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -36,6 +37,95 @@ class ShortcutTests(unittest.TestCase):
         )
         self.assertEqual(parsed[setup.shortcut_identity("SUPER + CTRL + Q")], "Calculator")
         self.assertEqual(parsed[setup.shortcut_identity("SUPER + ALT + Q")], "Another action")
+
+    def test_bounded_command_preserves_ordinary_output(self):
+        completed = setup._run_bounded(
+            [sys.executable, "-c", "import sys; print('ok'); sys.stderr.write('note')"],
+            stdout_limit=1024,
+            stderr_limit=1024,
+        )
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual(completed.stdout, "ok\n")
+        self.assertEqual(completed.stderr, "note")
+
+    def test_bounded_command_rejects_stdout_and_stderr_overflow(self):
+        for stream_name in ("stdout", "stderr"):
+            with self.subTest(stream=stream_name):
+                command = [
+                    sys.executable,
+                    "-c",
+                    f"import sys; sys.{stream_name}.buffer.write(b'x' * 1025)",
+                ]
+                with self.assertRaises(setup.SetupOutputTooLarge):
+                    setup._run_bounded(
+                        command, stdout_limit=1024, stderr_limit=1024
+                    )
+
+    def test_shortcut_status_rejects_unbounded_keybinding_output(self):
+        command = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stdout.buffer.write(b'x' * {setup.MAX_KEYBINDING_OUTPUT_BYTES + 1})",
+        ]
+        with patch("omaquickcalc_setup.KEYBINDING_COMMAND", command):
+            with self.assertRaises(setup.SetupOutputTooLarge):
+                setup.current_keybindings()
+
+    def test_cli_converts_keybinding_overflow_to_small_json_error(self):
+        helper = REPOSITORY / "omaquickcalc_setup.py"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            binary = root / "omarchy"
+            binary.write_text(
+                "#!/bin/sh\n"
+                f"exec {shlex.quote(sys.executable)} -c \"import sys; "
+                f"sys.stdout.buffer.write(b'x' * {setup.MAX_KEYBINDING_OUTPUT_BYTES + 1})\"\n",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+            environment = os.environ.copy()
+            environment["PATH"] = f"{root}:{environment['PATH']}"
+            completed = subprocess.run(
+                [str(helper), "shortcut-status", "SUPER + CTRL + Q"],
+                check=False,
+                capture_output=True,
+                env=environment,
+            )
+        self.assertEqual(completed.returncode, 1)
+        self.assertEqual(completed.stderr, b"")
+        self.assertLess(len(completed.stdout), 256)
+        self.assertEqual(
+            json.loads(completed.stdout)["error"],
+            "Setup command output exceeded its byte limit",
+        )
+
+    def test_hyprland_validation_rejects_unbounded_config_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "hyprctl"
+            binary.write_text(
+                "#!/bin/sh\n"
+                "if [ \"$1\" = configerrors ]; then\n"
+                f"  {shlex.quote(sys.executable)} -c \"import sys; "
+                f"sys.stdout.buffer.write(b'x' * {setup.MAX_HYPRCTL_OUTPUT_BYTES + 1})\"\n"
+                "fi\n",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+            environment = {"PATH": f"{directory}:{os.environ['PATH']}"}
+            with patch.dict(os.environ, environment, clear=False):
+                with self.assertRaises(setup.SetupOutputTooLarge):
+                    setup.hyprland_reload()
+
+    def test_apply_refuses_oversized_bindings_without_overwriting(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bindings.lua"
+            with path.open("wb") as stream:
+                stream.write(b"-- user content\n")
+                stream.truncate(setup.MAX_SETUP_FILE_BYTES + 1)
+            before = path.stat().st_size
+            with self.assertRaises(setup.SetupFileTooLarge):
+                setup.apply_shortcut(path, "SUPER + ALT + Q", PLUGIN_ID, False)
+            self.assertEqual(path.stat().st_size, before)
 
     def test_apply_preserves_user_content_and_replaces_only_owned_block(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -142,6 +232,15 @@ class LifecycleTests(unittest.TestCase):
             conflict = setup.ensure_launcher(desktop, PLUGIN_ID, SECOND_UPGRADE_VERSION)
             self.assertFalse(conflict["ok"])
             self.assertEqual(desktop.read_text(encoding="utf-8"), "[Desktop Entry]\nName=User file\n")
+
+    def test_launcher_refuses_oversized_existing_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            desktop = Path(directory) / "owned.desktop"
+            with desktop.open("wb") as stream:
+                stream.truncate(setup.MAX_SETUP_FILE_BYTES + 1)
+            with self.assertRaises(setup.SetupFileTooLarge):
+                setup.ensure_launcher(desktop, PLUGIN_ID, CURRENT_VERSION)
+            self.assertEqual(desktop.stat().st_size, setup.MAX_SETUP_FILE_BYTES + 1)
 
     def test_cli_install_launch_upgrade_and_remove(self):
         helper = Path(__file__).resolve().parents[1] / "omaquickcalc_setup.py"

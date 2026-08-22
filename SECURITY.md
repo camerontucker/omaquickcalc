@@ -21,7 +21,12 @@ releases are not maintained separately while the plugin is pre-1.0.
 - User-writable configuration, history, launch state, launcher, and wallpaper
   watcher files are not eagerly materialized by QML. State content is read
   through per-file byte ceilings, and unsafe state is preserved but not
-  overwritten. Dynamic overlay labels always render as literal plain text.
+  overwritten. Dynamic overlay labels and the selectable detail view always
+  render as literal plain text.
+- Mutable Qalculate rate metadata and shortcut setup files are read only as
+  regular UTF-8 files beneath explicit byte ceilings. Shortcut inspection and
+  Hyprland validation use bounded concurrent stdout/stderr reads, and the setup
+  helper emits a size-bounded JSON response before QML collects it.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
 - Normal launcher opens never inspect selected or clipboard text. An approved

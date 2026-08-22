@@ -1,6 +1,8 @@
 import subprocess
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import omaquickcalc_backend as backend
@@ -201,6 +203,21 @@ class StructuredEvaluatorTests(unittest.TestCase):
         expected_age = max(0, (backend.date.today() - backend.date.fromisoformat(rate_date)).days)
         self.assertEqual(age, expected_age)
         self.assertEqual(stale, expected_age > 7)
+
+    def test_rate_cache_reader_rejects_oversized_sparse_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rates.json"
+            with path.open("wb") as stream:
+                stream.truncate(1024 * 1024 * 1024)
+            with self.assertRaises(backend.RateCacheTooLarge):
+                backend._read_rate_cache(path)
+
+    def test_rate_cache_reader_preserves_ordinary_utf8(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rates.json"
+            content = '{"date":"2026-08-20","label":"café"}'
+            path.write_text(content, encoding="utf-8")
+            self.assertEqual(backend._read_rate_cache(path), content)
 
     def test_ambiguous_three_letter_text_is_not_a_hex_color(self):
         self.assertIsNone(backend.color_evaluation("abc"))

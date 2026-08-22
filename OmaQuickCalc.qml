@@ -3108,6 +3108,7 @@ Item {
               readOnly: true
               selectByMouse: true
               wrapMode: TextEdit.Wrap
+              textFormat: TextEdit.PlainText
               text: root.errorText || (root.result
                 ? (root.resultKind === "tax" && root.resultReport.detailText
                   ? String(root.resultReport.detailText)

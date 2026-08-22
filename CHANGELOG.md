@@ -9,6 +9,8 @@
   formats, and the final JSON response so oversized calculations fail safely.
 - Bound user-writable configuration, history, launch-state, and launcher reads
   before they reach QML, and render every overlay label as literal plain text.
+- Render the selectable detail pane as plain text, and bound Qalculate rate
+  metadata plus shortcut setup files, child output, errors, and JSON responses.
 
 ## 0.6.0 — 2026-08-22
 
