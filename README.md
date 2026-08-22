@@ -44,13 +44,11 @@ in Place can put it there.
 Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
 `1pm pacific` to convert directly to your local time.
 
-Type `1000 tax` for a local consumption-tax report. In Canada, the report shows
-tax added to the amount, all applicable taxes reversed from that amount as the
-total, and GST alone reversed from the total. A trailing tax modifier applies
-to the complete calculation, so `900 + 100 tax` produces the same report.
-Override the saved location inline with a query such as `1000 tax in Ontario`.
-Address-dependent schemes can use a saved custom combined rate or an inline
-query such as `1000 tax at 8.25%`.
+Type `1000 tax` for a local consumption-tax report using your saved or inferred
+location; in Canada it shows tax added, all applicable taxes reversed from the
+total, and GST alone reversed, while complete expressions such as
+`900 + 100 tax`, inline locations such as `1000 tax in Ontario`, and custom
+rates such as `1000 tax at 8.25%` are also supported.
 
 ## Transform in Place
 
