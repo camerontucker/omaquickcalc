@@ -139,6 +139,10 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("dependencies installed. Returning to setup", qml)
         self.assertIn("'{\\\"resumeSetup\\\":true}'", qml)
         self.assertNotIn("Press Enter to close this terminal", qml)
+        self.assertIn('"--app-id=TUI.float"', qml)
+        self.assertIn('"--title=Install OmaQuickCalc"', qml)
+        self.assertIn("root.dismiss()", qml)
+        self.assertNotIn("id: installerPoll", qml)
 
     def test_shortcut_setup_uses_plain_language(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")

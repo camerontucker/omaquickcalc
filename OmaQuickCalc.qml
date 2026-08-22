@@ -314,7 +314,7 @@ Item {
       return "Qalculate powers math, conversions, currencies, and time zones. Installation uses Omarchy and may ask for your password in a terminal."
     }
     if (setupPage === "installing-dependencies")
-      return "Finish the package installation in the terminal. It will close on success and return you here automatically."
+      return "OmaQuickCalc will hide while a centered terminal installs the required packages, then return here automatically."
     if (setupPage === "dependency-error") return setupError
     if (setupPage === "alternatives")
       return "We check whether each shortcut is already in use before you confirm it."
@@ -520,7 +520,6 @@ Item {
     root.transformOriginPid = 0
     root.transformOriginTerminal = false
     root.installRequested = false
-    installerPoll.stop()
     evaluationTimer.stop()
     root.evaluationGeneration += 1
     root.pendingExpression = ""
@@ -1514,7 +1513,6 @@ Item {
     if (available) {
       if (root.dependenciesAvailable) {
         root.installRequested = false
-        installerPoll.stop()
       }
       if (root.settings.refreshExchangeRates && !root.exchangeRefreshStarted) {
         root.exchangeRefreshStarted = true
@@ -1558,6 +1556,8 @@ Item {
     if (root.setupOpen) root.setupPage = "installing-dependencies"
     Quickshell.execDetached([
       "omarchy-launch-terminal",
+      "--app-id=TUI.float",
+      "--title=Install OmaQuickCalc",
       "bash", "-lc",
       "omarchy pkg add libqalculate wl-clipboard python; status=$?; "
         + "if [ $status -eq 0 ]; then "
@@ -1566,7 +1566,7 @@ Item {
         + "omarchy-shell shell summon io.github.camerontucker.omaquickcalc "
         + "'{\"resumeSetup\":true}' >/dev/null 2>&1; exit $status"
     ])
-    installerPoll.start()
+    root.dismiss()
   }
 
   function handleInputKey(event) {
@@ -1676,13 +1676,6 @@ Item {
     to: 1
     duration: 680
     easing.type: Easing.OutCubic
-  }
-
-  Timer {
-    id: installerPoll
-    interval: 2000
-    repeat: true
-    onTriggered: root.startBackendCheck()
   }
 
   Timer {
