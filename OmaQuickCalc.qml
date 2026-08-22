@@ -314,7 +314,7 @@ Item {
       return "Qalculate powers math, conversions, currencies, and time zones. Installation uses Omarchy and may ask for your password in a terminal."
     }
     if (setupPage === "installing-dependencies")
-      return "Finish the package installation in the terminal. Setup will continue automatically when the required tools are ready."
+      return "Finish the package installation in the terminal. It will close on success and return you here automatically."
     if (setupPage === "dependency-error") return setupError
     if (setupPage === "alternatives")
       return "We check whether each shortcut is already in use before you confirm it."
@@ -1560,9 +1560,11 @@ Item {
       "omarchy-launch-terminal",
       "bash", "-lc",
       "omarchy pkg add libqalculate wl-clipboard python; status=$?; "
-        + "if [ $status -eq 0 ]; then printf '\\nOmaQuickCalc dependencies installed.\\n'; "
-        + "else printf '\\nDependency installation failed.\\n'; fi; "
-        + "printf 'Press Enter to close this terminal...'; read -r; exit $status"
+        + "if [ $status -eq 0 ]; then "
+        + "printf '\\nOmaQuickCalc dependencies installed. Returning to setup...\\n'; "
+        + "else printf '\\nDependency installation failed. Review the output above, then press Enter to return...'; read -r; fi; "
+        + "omarchy-shell shell summon io.github.camerontucker.omaquickcalc "
+        + "'{\"resumeSetup\":true}' >/dev/null 2>&1; exit $status"
     ])
     installerPoll.start()
   }

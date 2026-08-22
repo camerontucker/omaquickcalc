@@ -16,6 +16,8 @@
   consent-based calculator-engine step that continues automatically.
 - Rewrite shortcut onboarding in plain language without exposing binding-file
   implementation details.
+- Return to onboarding automatically after the visible dependency terminal
+  closes instead of losing the setup flow when focus moves to the terminal.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,
