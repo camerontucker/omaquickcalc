@@ -17,7 +17,7 @@ BACKEND = REPOSITORY / "omaquickcalc_backend.py"
 class EvaluationLatencyTests(unittest.TestCase):
     def test_warm_backend_stays_inside_modal_ui_budget(self):
         expressions = ("1000 + 123", "64px in rem", "100 CAD in USD", "1pm pst",
-                       "900 + 100 tax")
+                       "900 + 100 tax in Manitoba")
         with tempfile.TemporaryDirectory() as directory:
             environment = os.environ.copy()
             environment.update({
