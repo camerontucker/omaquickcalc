@@ -41,14 +41,8 @@ in Place can put it there.
 
 ![1000 plus 123 equals 1123 with calculation history open](assets/readme-calculation-history.png)
 
-Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
-`1pm pacific` to convert directly to your local time.
-
-Type `1000 tax` for a local consumption-tax report using your saved or inferred
-location; in Canada it shows tax added, all applicable taxes reversed from the
-total, and GST alone reversed, while complete expressions such as
-`900 + 100 tax`, inline locations such as `1000 tax in Ontario`, and custom
-rates such as `1000 tax at 8.25%` are also supported.
+Also try `20% off 125`, `square root of 625`, `18% tip on 80`, `1pm pacific`
+for local time, or `1000 tax` for a local tax report.
 
 ## Transform in Place
 
