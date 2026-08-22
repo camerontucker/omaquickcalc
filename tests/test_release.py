@@ -128,6 +128,15 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertNotIn("onFileChanged:", launcher_view)
 
+    def test_missing_dependencies_use_a_dedicated_first_run_step(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn('if (setupPage === "dependencies") return [', qml)
+        self.assertIn('label: "Install calculator engine"', qml)
+        self.assertIn('"Missing: " + (missingDependencyPackages', qml)
+        self.assertIn('root.setupPage = "installing-dependencies"', qml)
+        self.assertIn('root.continueAfterDependencies()', qml)
+        self.assertIn("visible: !root.setupOpen", qml)
+
     def test_user_values_are_not_interpolated_into_shell_commands(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         self.assertIn('copyProcess.command = ["wl-copy", "--", String(value)]', qml)
