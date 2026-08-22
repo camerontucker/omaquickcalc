@@ -317,15 +317,15 @@ Item {
       return "Finish the package installation in the terminal. Setup will continue automatically when the required tools are ready."
     if (setupPage === "dependency-error") return setupError
     if (setupPage === "alternatives")
-      return "Existing bindings are shown before you confirm any replacement."
+      return "We check whether each shortcut is already in use before you confirm it."
     if (setupPage === "confirm")
-      return "The shortcut may capture short numeric selections. Only OmaQuickCalc’s marked binding block is managed."
+      return "This changes only the shortcut you confirm. Your other keyboard shortcuts stay untouched."
     if (setupPage === "applying")
-      return "Validating the binding with Hyprland. A failed change is rolled back automatically."
-    if (setupPage === "error") return "Your previous Hyprland configuration is still intact."
+      return "Checking that the shortcut works. If it fails, your current shortcuts will be restored."
+    if (setupPage === "error") return "Your existing shortcuts are unchanged."
     if (!launcherChecked) return "Preparing the Super + Space launcher entry. A shortcut is optional."
     if (launcherReady)
-      return "Super + Space stays clipboard-blind. A selection-aware keyboard shortcut is optional."
+      return "A launcher entry is ready in Super + Space. A keyboard shortcut is optional."
     return "An existing unowned launcher entry was left untouched. A shortcut is optional."
   }
   readonly property string displayResult: CalcModel.singleLine(result)

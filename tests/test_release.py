@@ -137,6 +137,12 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('root.continueAfterDependencies()', qml)
         self.assertIn("visible: !root.setupOpen", qml)
 
+    def test_shortcut_setup_uses_plain_language(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn("Your other keyboard shortcuts stay untouched.", qml)
+        self.assertNotIn("marked binding block", qml)
+        self.assertNotIn("clipboard-blind", qml)
+
     def test_user_values_are_not_interpolated_into_shell_commands(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         self.assertIn('copyProcess.command = ["wl-copy", "--", String(value)]', qml)
