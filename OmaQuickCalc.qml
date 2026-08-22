@@ -1640,12 +1640,10 @@ Item {
   FileView {
     id: launcherFile
     path: root.launcherPath
-    watchChanges: true
     atomicWrites: true
     printErrors: false
     onLoaded: root.ensureLauncher(text())
     onLoadFailed: root.ensureLauncher("")
-    onFileChanged: reload()
   }
 
   Process {

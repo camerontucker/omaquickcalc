@@ -121,6 +121,13 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("X-OmaQuickCalc-Managed=true", qml)
         self.assertNotIn("install.sh", qml)
 
+        launcher_view = qml.split("id: launcherFile", 1)[1].split("\n  }", 1)[0]
+        self.assertNotIn(
+            "watchChanges:", launcher_view,
+            "deleting the owned launcher during uninstall must not recreate it",
+        )
+        self.assertNotIn("onFileChanged:", launcher_view)
+
     def test_user_values_are_not_interpolated_into_shell_commands(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         self.assertIn('copyProcess.command = ["wl-copy", "--", String(value)]', qml)

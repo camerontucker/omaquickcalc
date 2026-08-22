@@ -10,6 +10,8 @@
 - Preserve symlinked dotfile-managed Hyprland bindings and reject dangling
   binding symlinks.
 - Add safe launcher upgrades and managed integration removal.
+- Prevent the managed launcher from being recreated while the plugin unloads
+  during removal.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,
