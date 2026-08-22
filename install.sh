@@ -21,7 +21,7 @@ fi
 omarchy-shell shell rescanPlugins
 omarchy plugin enable io.github.camerontucker.omaquickcalc
 python3 "$plugin_source/omaquickcalc_setup.py" ensure-launcher \
-  --plugin-id io.github.camerontucker.omaquickcalc --version 0.5.0
+  --plugin-id io.github.camerontucker.omaquickcalc --version 0.6.0
 
 printf 'OmaQuickCalc is installed and enabled.\n'
 printf 'Open Super + Space and search for OmaQuickCalc to finish launch setup.\n'

@@ -4,7 +4,7 @@
   A fast modal calculator for Omarchy Quattro.
 </p>
 
-![OmaQuickCalc converting 100 CAD to 72.61 USD over the Omarchy wallpaper](assets/readme-currency-conversion.png)
+![OmaQuickCalc showing a location-aware Manitoba GST and PST report](assets/readme-tax-report.png)
 
 <p align="center">
   <a href="#install"><strong>Install</strong></a>
@@ -32,6 +32,10 @@ in Place can put it there.
 **Currency conversion**
 
 ![100 Canadian dollars converted to 72.61 US dollars with the current rate date](assets/readme-currency-conversion.png)
+
+**Local tax report**
+
+![1000 tax showing Manitoba GST and PST added and reverse-calculated](assets/readme-tax-report.png)
 
 **Calculation history**
 

@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "io.github.camerontucker.omaquickcalc",
   "name": "OmaQuickCalc",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "Cam Tucker",
-  "description": "A fast modal calculator for Omarchy with live math, currencies, units, dates, timezones, history, and Transform in Place",
+  "description": "A fast modal calculator for Omarchy with live math, local tax reports, currencies, units, dates, timezones, history, and Transform in Place",
   "kinds": [
     "overlay"
   ],

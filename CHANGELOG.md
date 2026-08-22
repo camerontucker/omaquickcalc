@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-08-22
+
 - Show compact example calculations in the reserved result row after three
   idle seconds, then hand the same space to the first successful calculation.
 - Add local, province-aware Canadian tax reports with add-tax, reverse-all-tax,
