@@ -74,10 +74,18 @@ Item {
   property bool setupApplyStarted: false
   property bool launcherChecked: false
   property bool launcherReady: false
+  property bool launcherPresenceStarted: false
 
   property bool storageReady: false
   property bool defaultConfigWritten: false
   property bool settingsMigrationWritten: false
+  property var stateReadQueue: []
+  property string activeStateKind: ""
+  property string stateReadContent: ""
+  property bool configStateWritable: false
+  property bool historyStateWritable: false
+  property bool launchStateWritable: false
+  property bool launcherStateWritable: false
   property bool backendChecked: false
   property bool backendAvailable: false
   property bool backendCheckStarted: false
@@ -147,6 +155,7 @@ Item {
   readonly property string setupHelperPath: pluginDir + "/omaquickcalc_setup.py"
   readonly property string transformHelperPath: pluginDir + "/omaquickcalc_transform.py"
   readonly property string contrastHelperPath: pluginDir + "/omaquickcalc_contrast.py"
+  readonly property string stateHelperPath: pluginDir + "/omaquickcalc_state.py"
 
   property string fontFamily: Style.font.menuFamily
   property color background: Color.menu.background
@@ -551,8 +560,11 @@ Item {
     if (root.transformToken) root.startTransformRead()
 
     if (!root.backendChecked || !root.backendAvailable) root.startBackendCheck()
-    if (root.setupForced || !root.launchSetupComplete) root.beginLaunchSetup()
-    else root.focusCalculator()
+    if (root.setupForced) root.beginLaunchSetup()
+    else if (root.launchStateLoaded) {
+      if (!root.launchSetupComplete) root.beginLaunchSetup()
+      else root.focusCalculator()
+    }
   }
 
   function close() {
@@ -625,6 +637,67 @@ Item {
       + "[Desktop Action Setup]\n"
       + "Name=Configure launch shortcut\n"
       + "Exec=omarchy-shell shell summon " + root.pluginId + " {\"setup\":true}\n"
+  }
+
+  function requestStateRead(kind, path) {
+    var next = []
+    for (var index = 0; index < root.stateReadQueue.length; index += 1) {
+      if (root.stateReadQueue[index].kind !== kind) next.push(root.stateReadQueue[index])
+    }
+    next.push({ kind: String(kind), path: String(path) })
+    root.stateReadQueue = next
+    root.startNextStateRead()
+  }
+
+  function startNextStateRead() {
+    if (stateReadProcess.running || root.activeStateKind || root.stateReadQueue.length === 0)
+      return
+    var request = root.stateReadQueue[0]
+    root.stateReadQueue = root.stateReadQueue.slice(1)
+    root.activeStateKind = request.kind
+    root.stateReadContent = ""
+    stateReadProcess.command = [
+      "python3", root.stateHelperPath, "read", "--kind", request.kind,
+      "--path", request.path
+    ]
+    stateReadProcess.running = true
+  }
+
+  function finishStateRead(exitCode, raw) {
+    var kind = root.activeStateKind
+    if (!kind) return
+    root.activeStateKind = ""
+    var missing = exitCode === 10
+    var readable = exitCode === 0 || missing
+    var value = exitCode === 0 ? String(raw || "") : ""
+    root.stateReadContent = ""
+
+    if (kind === "config") {
+      root.configStateWritable = readable
+      root.loadSettings(value, readable)
+    } else if (kind === "history") {
+      root.historyStateWritable = readable
+      root.loadHistory(exitCode === 0 ? value : "[]")
+    } else if (kind === "launch") {
+      root.launchStateWritable = readable
+      root.loadLaunchState(exitCode === 0 ? value : "{}")
+    } else if (kind === "launcher") {
+      root.launcherStateWritable = readable
+      if (readable) root.ensureLauncher(value)
+      else {
+        root.launcherChecked = true
+        root.launcherReady = false
+      }
+    }
+
+    if (!readable && root.opened)
+      root.statusText = "Local " + kind + " state is too large or invalid"
+    Qt.callLater(function() { root.startNextStateRead() })
+  }
+
+  function requestCoreStateReads() {
+    root.requestStateRead("config", root.configPath)
+    root.requestStateRead("launch", root.launchStatePath)
   }
 
   function ensureLauncher(raw) {
@@ -762,7 +835,8 @@ Item {
       choice: String(choice || "skip"),
       shortcut: String(shortcut || "")
     }
-    launchStateFile.setText(JSON.stringify(state, null, 2) + "\n")
+    if (root.launchStateWritable)
+      launchStateFile.setText(JSON.stringify(state, null, 2) + "\n")
     root.launchSetupComplete = true
   }
 
@@ -944,16 +1018,17 @@ Item {
     root.actionItems = []
   }
 
-  function loadSettings(raw) {
+  function loadSettings(raw, allowWrites) {
     var rawText = String(raw || "").trim()
+    var writable = allowWrites !== false
     var oldBinary = root.settings.qalcBinary
     root.settings = CalcModel.parseSettings(raw)
     root.pendingTimeoutMs = root.settings.previewTimeoutMs
 
-    if (!rawText && root.storageReady && !root.defaultConfigWritten) {
+    if (writable && !rawText && root.storageReady && !root.defaultConfigWritten) {
       root.defaultConfigWritten = true
       configFile.setText(JSON.stringify(root.settings, null, 2) + "\n")
-    } else if (rawText && root.storageReady && !root.settingsMigrationWritten) {
+    } else if (writable && rawText && root.storageReady && !root.settingsMigrationWritten) {
       var parsed = ({})
       try { parsed = JSON.parse(rawText) } catch (error) { parsed = ({}) }
       if (parsed.version !== root.settings.version
@@ -974,7 +1049,8 @@ Item {
       }
     }
 
-    if (root.settings.historyMode === "persistent") historyFile.reload()
+    if (root.settings.historyMode === "persistent")
+      root.requestStateRead("history", root.historyPath)
     else root.history = []
 
     if (oldBinary !== root.settings.qalcBinary || !root.backendChecked)
@@ -985,15 +1061,17 @@ Item {
     var previousHistoryMode = root.settings.historyMode
     root.settings = CalcModel.patchSettings(root.settings, changes)
     root.pendingTimeoutMs = root.settings.previewTimeoutMs
-    if (root.storageReady)
+    if (root.storageReady && root.configStateWritable)
       configFile.setText(JSON.stringify(root.settings, null, 2) + "\n")
 
     if (previousHistoryMode !== root.settings.historyMode) {
-      if (root.settings.historyMode === "persistent") historyFile.reload()
+      if (root.settings.historyMode === "persistent")
+        root.requestStateRead("history", root.historyPath)
       else root.history = []
     }
     if (root.expression.trim()) root.scheduleEvaluation()
-    root.statusText = "Preferences saved"
+    root.statusText = root.configStateWritable
+      ? "Preferences saved" : "Configuration file is too large or invalid"
   }
 
   function adjustPreference(delta) {
@@ -1067,7 +1145,8 @@ Item {
   }
 
   function saveHistory() {
-    if (root.settings.historyMode !== "persistent" || !root.storageReady) return
+    if (root.settings.historyMode !== "persistent" || !root.storageReady
+        || !root.historyStateWritable) return
     historyFile.setText(JSON.stringify(root.history, null, 2) + "\n")
   }
 
@@ -1586,6 +1665,15 @@ Item {
     root.pythonCheckStarted = false
     root.pythonAvailable = available
     root.pythonChecked = true
+    if (available && root.storageReady && !stateReadProcess.running
+        && !root.activeStateKind && root.stateReadQueue.length === 0) {
+      if (!root.configStateWritable || !root.launchStateWritable)
+        root.requestCoreStateReads()
+      if (!root.historyStateWritable && root.settings.historyMode === "persistent")
+        root.requestStateRead("history", root.historyPath)
+      if (!root.launcherStateWritable)
+        root.requestStateRead("launcher", root.launcherPath)
+    }
     root.updateDependencyState()
   }
 
@@ -1792,6 +1880,7 @@ Item {
 
   FileView {
     path: Quickshell.env("HOME") + "/.local/state/omarchy/current/background"
+    preload: false
     watchChanges: true
     printErrors: false
     onFileChanged: root.scheduleContrastRefresh()
@@ -1807,46 +1896,87 @@ Item {
     onExited: function(exitCode) { root.finishContrastRefresh(exitCode) }
   }
 
+  Process {
+    id: stateReadProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.stateReadContent = text
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) {
+      Qt.callLater(function() { root.finishStateRead(exitCode, root.stateReadContent) })
+    }
+    onRunningChanged: {
+      if (!running && root.activeStateKind) {
+        Qt.callLater(function() {
+          if (root.activeStateKind) root.finishStateRead(127, "")
+        })
+      }
+    }
+  }
+
   FileView {
     id: configFile
     path: root.configPath
+    preload: false
     watchChanges: true
     atomicWrites: true
     printErrors: false
-    onLoaded: root.loadSettings(text())
-    onLoadFailed: root.loadSettings("")
-    onFileChanged: reload()
+    onFileChanged: root.requestStateRead("config", root.configPath)
   }
 
   FileView {
     id: historyFile
     path: root.historyPath
+    preload: false
     watchChanges: true
     atomicWrites: true
     printErrors: false
-    onLoaded: root.loadHistory(text())
-    onLoadFailed: root.loadHistory("[]")
-    onFileChanged: reload()
+    onFileChanged: root.requestStateRead("history", root.historyPath)
   }
 
   FileView {
     id: launchStateFile
     path: root.launchStatePath
+    preload: false
     watchChanges: true
     atomicWrites: true
     printErrors: false
-    onLoaded: root.loadLaunchState(text())
-    onLoadFailed: root.loadLaunchState("{}")
-    onFileChanged: reload()
+    onFileChanged: root.requestStateRead("launch", root.launchStatePath)
   }
 
   FileView {
     id: launcherFile
     path: root.launcherPath
+    preload: false
     atomicWrites: true
     printErrors: false
-    onLoaded: root.ensureLauncher(text())
-    onLoadFailed: root.ensureLauncher("")
+  }
+
+  Process {
+    id: launcherPresence
+    onExited: function(exitCode) {
+      root.launcherPresenceStarted = false
+      if (exitCode === 0) root.requestStateRead("launcher", root.launcherPath)
+      else if (exitCode === 1) {
+        root.launcherStateWritable = true
+        root.ensureLauncher("")
+      }
+      else {
+        root.launcherChecked = true
+        root.launcherReady = false
+      }
+    }
+    onRunningChanged: {
+      if (!running && root.launcherPresenceStarted) {
+        Qt.callLater(function() {
+          if (!root.launcherPresenceStarted) return
+          root.launcherPresenceStarted = false
+          root.launcherChecked = true
+          root.launcherReady = false
+        })
+      }
+    }
   }
 
   Process {
@@ -1854,10 +1984,10 @@ Item {
     command: ["mkdir", "-p", root.dataDir, root.configDir, root.dataHome + "/applications"]
     onExited: {
       root.storageReady = true
-      configFile.reload()
-      historyFile.reload()
-      launchStateFile.reload()
-      launcherFile.reload()
+      root.requestCoreStateReads()
+      root.launcherPresenceStarted = true
+      launcherPresence.command = ["test", "-e", root.launcherPath]
+      launcherPresence.running = true
       if (!root.backendChecked) root.startBackendCheck()
     }
   }
@@ -2133,7 +2263,7 @@ Item {
             if (root.handleSetupKey(event)) event.accepted = true
           }
 
-          Text {
+          PlainText {
             id: setupTitle
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2146,7 +2276,7 @@ Item {
             elide: Text.ElideRight
           }
 
-          Text {
+          PlainText {
             id: setupDescription
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2185,7 +2315,7 @@ Item {
                 border.color: Util.alpha(root.accent, 0.52)
                 opacity: setupRow.modelData.enabled === false ? 0.45 : 1
 
-                Text {
+                PlainText {
                   anchors.left: parent.left
                   anchors.leftMargin: Style.space(14)
                   anchors.right: parent.right
@@ -2200,7 +2330,7 @@ Item {
                   elide: Text.ElideRight
                 }
 
-                Text {
+                PlainText {
                   anchors.left: parent.left
                   anchors.leftMargin: Style.space(14)
                   anchors.right: parent.right
@@ -2230,7 +2360,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             anchors.centerIn: parent
             visible: root.setupPage === "applying"
               || root.setupPage === "checking-dependencies"
@@ -2243,7 +2373,7 @@ Item {
             font.pixelSize: Style.font.title
           }
 
-          Text {
+          PlainText {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -2269,7 +2399,7 @@ Item {
           height: root.rowContentHeight
           visible: !root.setupOpen
 
-          Text {
+          PlainText {
             id: transformOperandLabel
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
@@ -2285,7 +2415,7 @@ Item {
             elide: Text.ElideRight
           }
 
-          Text {
+          PlainText {
             anchors.left: transformOperandLabel.visible ? transformOperandLabel.right : parent.left
             anchors.leftMargin: transformOperandLabel.visible ? Style.spacing.md : 0
             anchors.right: outputArea.left
@@ -2342,7 +2472,7 @@ Item {
             height: parent.height
             visible: width > 0
 
-            Text {
+            PlainText {
               anchors.left: parent.left
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
@@ -2406,7 +2536,7 @@ Item {
               border.color: root.border
             }
 
-            Text {
+            PlainText {
               id: copyResultHint
               anchors.right: parent.right
               anchors.verticalCenter: parent.verticalCenter
@@ -2417,7 +2547,7 @@ Item {
               font.pixelSize: Style.font.body
             }
 
-            Text {
+            PlainText {
               id: rateMetadata
               visible: root.rateSummary.length > 0 || root.resultNote.length > 0
               width: visible ? Math.min(implicitWidth, Style.space(220)) : 0
@@ -2433,7 +2563,7 @@ Item {
               elide: Text.ElideLeft
             }
 
-            Text {
+            PlainText {
               id: resultValue
               visible: !root.capabilityExamplesVisible
               anchors.left: resultColorSwatch.visible ? resultColorSwatch.right : parent.left
@@ -2464,7 +2594,7 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               spacing: Style.space(8)
 
-              Text {
+              PlainText {
                 text: "Try"
                 color: root.foreground
                 opacity: 0.42
@@ -2476,7 +2606,7 @@ Item {
               Repeater {
                 model: root.capabilityExamples
 
-                delegate: Text {
+                delegate: PlainText {
                   id: capabilityExample
                   required property int index
                   required property string modelData
@@ -2591,7 +2721,7 @@ Item {
               id: ramanujanMotif
               model: 4
 
-              delegate: Text {
+              delegate: PlainText {
                 id: ramanujanCube
                 required property int index
                 readonly property real progress: root.settings.reducedMotion
@@ -2705,7 +2835,7 @@ Item {
                   anchors.top: parent.top
                   spacing: Style.space(3)
 
-                  Text {
+                  PlainText {
                     width: parent.width
                     text: String(taxSection.modelData.title || "")
                     color: root.accent
@@ -2725,7 +2855,7 @@ Item {
                       width: taxSection.width - (taxSection.index > 0 ? Style.space(10) : 0)
                       height: Style.space(25)
 
-                      Text {
+                      PlainText {
                         anchors.left: parent.left
                         anchors.right: taxReportValue.left
                         anchors.rightMargin: Style.spacing.sm
@@ -2740,7 +2870,7 @@ Item {
                         elide: Text.ElideRight
                       }
 
-                      Text {
+                      PlainText {
                         id: taxReportValue
                         width: parent.width * 0.56
                         anchors.right: parent.right
@@ -2767,7 +2897,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: taxReportFooter
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2801,7 +2931,7 @@ Item {
             opacity: 0.65
           }
 
-          Text {
+          PlainText {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: Style.space(16)
             visible: root.displayHistory.length === 0
@@ -2823,7 +2953,7 @@ Item {
             radius: Math.max(3, root.cornerRadius - Style.space(4))
             color: Util.alpha(root.foreground, 0.055)
 
-            Text {
+            PlainText {
               anchors.left: parent.left
               anchors.leftMargin: Style.space(10)
               anchors.verticalCenter: parent.verticalCenter
@@ -2879,7 +3009,7 @@ Item {
               radius: Math.max(0, root.cornerRadius - Style.space(3))
               color: index === root.selectedHistoryIndex ? Util.alpha(root.accent, 0.13) : "transparent"
 
-              Text {
+              PlainText {
                 id: pinMark
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(10)
@@ -2890,7 +3020,7 @@ Item {
                 font.pixelSize: Style.font.caption
               }
 
-              Text {
+              PlainText {
                 anchors.left: parent.left
                 anchors.leftMargin: historyRow.modelData.pinned ? Style.space(28) : Style.space(10)
                 anchors.right: rowResult.left
@@ -2903,7 +3033,7 @@ Item {
                 elide: Text.ElideRight
               }
 
-              Text {
+              PlainText {
                 id: rowResult
                 width: parent.width * 0.42
                 anchors.right: parent.right
@@ -2929,7 +3059,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: historyHelp
             anchors.left: parent.left
             anchors.right: parent.right
@@ -2993,7 +3123,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: detailHelp
             anchors.left: parent.left
             anchors.right: parent.right
@@ -3050,7 +3180,7 @@ Item {
                 ? Util.alpha(root.accent, 0.13) : "transparent"
               opacity: actionRow.modelData.enabled === false ? 0.46 : 1
 
-              Text {
+              PlainText {
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(10)
                 anchors.right: actionValue.left
@@ -3063,7 +3193,7 @@ Item {
                 elide: Text.ElideRight
               }
 
-              Text {
+              PlainText {
                 id: actionValue
                 width: parent.width * 0.42
                 anchors.right: parent.right
@@ -3090,7 +3220,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: actionHelp
             anchors.left: parent.left
             anchors.right: parent.right
@@ -3122,7 +3252,7 @@ Item {
             opacity: 0.65
           }
 
-          Text {
+          PlainText {
             id: preferencesTitle
             anchors.left: parent.left
             anchors.top: parent.top
@@ -3157,7 +3287,7 @@ Item {
               color: index === root.selectedPreferenceIndex
                 ? Util.alpha(root.accent, 0.13) : "transparent"
 
-              Text {
+              PlainText {
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(10)
                 anchors.right: preferenceValue.left
@@ -3170,7 +3300,7 @@ Item {
                 elide: Text.ElideRight
               }
 
-              Text {
+              PlainText {
                 id: preferenceValue
                 anchors.right: parent.right
                 anchors.rightMargin: Style.space(10)
@@ -3194,7 +3324,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: preferencesHelp
             anchors.left: parent.left
             anchors.right: parent.right
@@ -3226,7 +3356,7 @@ Item {
             opacity: 0.65
           }
 
-          Text {
+          PlainText {
             id: shortcutHelpTitle
             anchors.left: parent.left
             anchors.top: parent.top
@@ -3254,7 +3384,7 @@ Item {
               width: ListView.view.width
               height: Style.space(28)
 
-              Text {
+              PlainText {
                 width: parent.width * 0.28
                 anchors.left: parent.left
                 anchors.leftMargin: Style.space(10)
@@ -3266,7 +3396,7 @@ Item {
                 font.weight: Font.DemiBold
               }
 
-              Text {
+              PlainText {
                 anchors.left: parent.left
                 anchors.leftMargin: parent.width * 0.31
                 anchors.right: parent.right
@@ -3281,7 +3411,7 @@ Item {
             }
           }
 
-          Text {
+          PlainText {
             id: shortcutHelpFooter
             anchors.left: parent.left
             anchors.right: parent.right

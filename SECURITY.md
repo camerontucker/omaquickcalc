@@ -18,6 +18,10 @@ releases are not maintained separately while the plugin is pre-1.0.
 - Calculator input and backend responses are size-bounded. The `qalc` child
   also runs with time, address-space, stdout, and stderr limits; oversized or
   resource-intensive calculations fail without being materialized by the UI.
+- User-writable configuration, history, launch state, launcher, and wallpaper
+  watcher files are not eagerly materialized by QML. State content is read
+  through per-file byte ceilings, and unsafe state is preserved but not
+  overwritten. Dynamic overlay labels always render as literal plain text.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
 - Normal launcher opens never inspect selected or clipboard text. An approved

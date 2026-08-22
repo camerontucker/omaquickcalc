@@ -7,6 +7,8 @@
   the verified originating window.
 - Bound calculator input, qalc memory and captured output, derived numeric
   formats, and the final JSON response so oversized calculations fail safely.
+- Bound user-writable configuration, history, launch-state, and launcher reads
+  before they reach QML, and render every overlay label as literal plain text.
 
 ## 0.6.0 — 2026-08-22
 

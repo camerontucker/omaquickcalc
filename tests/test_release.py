@@ -42,6 +42,8 @@ class ReleaseContractTests(unittest.TestCase):
             "SECURITY.md",
             "data/tax_schemes.json",
             "manifest.json",
+            "PlainText.qml",
+            "omaquickcalc_state.py",
             "omaquickcalc_tax.py",
             "preview.png",
         ):
@@ -102,7 +104,7 @@ class ReleaseContractTests(unittest.TestCase):
         }
         for relative_path in (
             "omaquickcalc_backend.py", "omaquickcalc_contrast.py", "omaquickcalc_setup.py",
-            "omaquickcalc_tax.py", "omaquickcalc_transform.py",
+            "omaquickcalc_state.py", "omaquickcalc_tax.py", "omaquickcalc_transform.py",
         ):
             tree = ast.parse((REPOSITORY / relative_path).read_text(encoding="utf-8"))
             imported = {
@@ -123,6 +125,7 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("id: launcherFile", qml)
         self.assertIn("X-OmaQuickCalc-Managed=true", qml)
         self.assertNotIn("install.sh", qml)
+        self.assertIn('launcherPresence.command = ["test", "-e", root.launcherPath]', qml)
 
         launcher_view = qml.split("id: launcherFile", 1)[1].split("\n  }", 1)[0]
         self.assertNotIn(
@@ -170,6 +173,21 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("resource.RLIMIT_AS", backend)
         self.assertNotIn("capture_output=True", backend)
         self.assertIn("maximumLength: 4096", qml)
+
+    def test_local_state_reads_and_dynamic_text_are_bounded(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        plain_text = (REPOSITORY / "PlainText.qml").read_text(encoding="utf-8")
+        state_helper = (REPOSITORY / "omaquickcalc_state.py").read_text(encoding="utf-8")
+        self.assertIn("textFormat: Text.PlainText", plain_text)
+        self.assertNotRegex(qml, r"(?<!Plain)Text\s*\{")
+        self.assertIn("root.stateHelperPath", qml)
+        self.assertIn('"read", "--kind"', qml)
+        self.assertNotIn("text()", qml)
+        self.assertNotIn(".reload()", qml)
+        for identifier in ("configFile", "historyFile", "launchStateFile", "launcherFile"):
+            view = qml.split(f"id: {identifier}", 1)[1].split("\n  }", 1)[0]
+            self.assertIn("preload: false", view)
+        self.assertIn("stream.read(byte_limit + 1)", state_helper)
 
     def test_transform_in_place_contract(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
