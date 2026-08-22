@@ -67,6 +67,15 @@ class NaturalLanguageTests(unittest.TestCase):
 
 
 class StructuredEvaluatorTests(unittest.TestCase):
+    @patch("omaquickcalc_backend.subprocess.run")
+    def test_quattro_easter_egg_is_local_and_copies_four(self, run):
+        result = backend.evaluate("  QuAtTrO  ")
+        self.assertTrue(result.ok)
+        self.assertEqual(result.result, "4")
+        self.assertEqual(result.rawResult, "4")
+        self.assertEqual(result.kind, "easter-egg")
+        run.assert_not_called()
+
     def test_design_and_duration_calculations(self):
         self.assertEqual(backend.evaluate("64px in rem").result, "4 rem")
         self.assertEqual(backend.evaluate("90 mins to timespan").result, "1 hour 30 minutes")

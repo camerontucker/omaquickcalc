@@ -2,8 +2,9 @@
 
 OmaQuickCalc creates `$XDG_CONFIG_HOME/omaquickcalc/config.json`, falling back
 to `~/.config/omaquickcalc/config.json`. Press `Ctrl+,` in OmaQuickCalc to
-change card opacity, history mode, and common default currency pairs. Edit the
-JSON file for advanced values or any other ISO currency; changes reload live.
+change card opacity, history mode, motion, and common default currency pairs.
+Edit the JSON file for advanced values or any other ISO currency; changes
+reload live.
 
 The generated defaults are:
 
@@ -27,6 +28,7 @@ The generated defaults are:
   "rateStaleDays": 7,
   "refreshExchangeRates": true,
   "backgroundOpacity": 0.92,
+  "reducedMotion": false,
   "remPx": 16,
   "workdayHours": 8,
   "inputHint": "Type a calculation…"
@@ -55,6 +57,7 @@ The generated defaults are:
 | `rateStaleDays` | `1`–`365` | Age after which cached exchange rates are marked stale. |
 | `refreshExchangeRates` | `true`, `false` | Allow Qalculate's daily exchange-rate update behavior. |
 | `backgroundOpacity` | `0`–`1` | Floating card opacity; text contrast follows the wallpaper beneath the card automatically. |
+| `reducedMotion` | `true`, `false` | Disable decorative effects and card-resize animation while preserving all calculator feedback. |
 | `remPx` | `1`–`512` | Pixel basis for REM/PX conversions. |
 | `workdayHours` | `1`–`24` | Hours used for workday conversions. |
 | `inputHint` | text | Placeholder shown in the empty input. |

@@ -142,6 +142,13 @@ def clean_name(value: str) -> str:
     return " ".join("".join(c for c in normalized if not unicodedata.combining(c)).replace("_", " ").split())
 
 
+def easter_egg_evaluation(expression: str) -> Evaluation | None:
+    if clean_name(expression) != "quattro":
+        return None
+    return Evaluation(True, "4", "4", kind="easter-egg",
+                      normalizedExpression="quattro")
+
+
 def local_zone() -> tzinfo:
     return datetime.now().astimezone().tzinfo
 
@@ -872,6 +879,7 @@ def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
     rate_stale_days = max(1, min(365, int(rate_stale_days)))
 
     for evaluator in (
+        easter_egg_evaluation,
         color_evaluation,
         lambda value: timezone_evaluation(value, clock_format),
         lambda value: date_evaluation(value, clock_format),

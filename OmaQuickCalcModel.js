@@ -19,6 +19,7 @@ var defaults = {
   rateStaleDays: 7,
   refreshExchangeRates: true,
   backgroundOpacity: 0.92,
+  reducedMotion: false,
   remPx: 16,
   workdayHours: 8,
   inputHint: "Type a calculation…"
@@ -81,6 +82,8 @@ function parseSettings(raw) {
       ? defaults.refreshExchangeRates : Boolean(parsed.refreshExchangeRates),
     backgroundOpacity: boundedNumber(parsed.backgroundOpacity,
       defaults.backgroundOpacity, 0, 1),
+    reducedMotion: parsed.reducedMotion === undefined
+      ? defaults.reducedMotion : Boolean(parsed.reducedMotion),
     remPx: boundedNumber(parsed.remPx, defaults.remPx, 1, 512),
     workdayHours: boundedNumber(parsed.workdayHours, defaults.workdayHours, 1, 24),
     inputHint: String(parsed.inputHint || defaults.inputHint)

@@ -8,6 +8,7 @@ TestCase {
   function test_preferences_patch_preserves_unrelated_settings() {
     var original = Model.parseSettings(JSON.stringify({
       backgroundOpacity: 0.92,
+      reducedMotion: false,
       historyMode: "persistent",
       precision: 17,
       defaultFromCurrency: "USD",
@@ -15,10 +16,12 @@ TestCase {
     }))
     var updated = Model.patchSettings(original, {
       backgroundOpacity: 0.65,
-      historyMode: "session"
+      historyMode: "session",
+      reducedMotion: true
     })
     compare(updated.backgroundOpacity, 0.65)
     compare(updated.historyMode, "session")
+    compare(updated.reducedMotion, true)
     compare(updated.precision, 17)
     compare(updated.defaultFromCurrency, "USD")
     compare(updated.defaultToCurrency, "CAD")

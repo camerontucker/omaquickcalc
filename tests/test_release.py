@@ -135,7 +135,7 @@ class ReleaseContractTests(unittest.TestCase):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         setup = (REPOSITORY / "omaquickcalc_setup.py").read_text(encoding="utf-8")
         self.assertIn('root.submit("replace-selection")', qml)
-        self.assertIn("if (root.transformActive) return", qml)
+        self.assertIn('if (root.transformActive || root.resultKind === "easter-egg") return', qml)
         self.assertIn('"consume", "--token"', qml)
         self.assertIn('return query + " " + operand', qml)
         self.assertIn('return operand + " to " + query.replace', qml)
@@ -170,6 +170,16 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('id: shortcutHelpPane', qml)
         self.assertIn('items.push({ id: "preferences"', qml)
         self.assertNotIn('if (!root.result) return\n    root.historyOpen', qml)
+
+    def test_quattro_easter_egg_stays_subtle_and_copyable(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn('resultKind === "easter-egg" && result === "4"', qml)
+        self.assertIn('text: root.easterEggActive ? "Fast by design."', qml)
+        self.assertIn('model: 4', qml)
+        self.assertIn('!root.settings.reducedMotion', qml)
+        self.assertIn('Behavior on height {\n        enabled: !root.settings.reducedMotion', qml)
+        self.assertIn('root.resultKind === "easter-egg"', qml)
+        self.assertIn('root.queueCopy(evaluatedResult, keepOpen)', qml)
 
 
 if __name__ == "__main__":

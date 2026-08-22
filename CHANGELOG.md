@@ -35,3 +35,5 @@
   storefront asset contracts to the release gate.
 - Replace the marketplace preview with the normal calculator experience and
   remove the obsolete demo video.
+- Add a tiny Quattro Easter egg with a copyable `4`, four theme-aware sparks,
+  and an accessible reduced-motion preference.

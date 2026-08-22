@@ -138,6 +138,7 @@ Item {
   property color contrastCandidate: Color.background
   property color contrastForeground: themeForeground
   property color sampledSurface: background
+  property real easterEggProgress: 0
   readonly property color foreground: contrastForeground
   property color border: Color.menu.border
   property color scrim: Color.menu.scrim
@@ -162,7 +163,7 @@ Item {
     ? Style.space(14) + Math.min(7, Math.max(1, actionItems.length)) * Style.space(42) + Style.space(26)
     : 0
   readonly property int helpExtraHeight: helpOpen ? Style.space(330) : 0
-  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(246) : 0
+  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(290) : 0
   readonly property int cardWidth: Math.min(Style.space(720), panel.width - Style.gapsOut * 2)
   readonly property int cardHeight: setupOpen ? Style.space(380) : baseCardHeight
     + Math.max(historyExtraHeight, detailExtraHeight, actionExtraHeight,
@@ -178,6 +179,7 @@ Item {
       value: Math.round(settings.backgroundOpacity * 100) + "%" },
     { id: "history", label: "History", value: settings.historyMode === "persistent"
       ? "Persistent" : (settings.historyMode === "session" ? "This session" : "Off") },
+    { id: "motion", label: "Motion", value: settings.reducedMotion ? "Reduced" : "Full" },
     { id: "from-currency", label: "Default source currency", value: settings.defaultFromCurrency },
     { id: "to-currency", label: "Default target currency", value: settings.defaultToCurrency }
   ]
@@ -275,6 +277,7 @@ Item {
     return "An existing unowned launcher entry was left untouched. A shortcut is optional."
   }
   readonly property string displayResult: CalcModel.singleLine(result)
+  readonly property bool easterEggActive: resultKind === "easter-egg" && result === "4"
   readonly property string rateSummary: {
     if (resultKind !== "currency" || !rateDate) return ""
     if (rateStatusOverride) return rateStatusOverride
@@ -300,6 +303,13 @@ Item {
     if (root.opened && !root.setupOpen) root.scheduleEvaluation()
   }
 
+  onSettingsChanged: {
+    if (root.settings.reducedMotion) {
+      easterEggAnimation.stop()
+      root.easterEggProgress = 0
+    }
+  }
+
   onBackgroundChanged: root.scheduleContrastRefresh()
   onThemeForegroundChanged: root.scheduleContrastRefresh()
   onContrastCandidateChanged: root.scheduleContrastRefresh()
@@ -307,6 +317,12 @@ Item {
   onCardBackgroundChanged: root.scheduleContrastRefresh()
   onCardWidthChanged: root.scheduleContrastRefresh()
   onCardHeightChanged: root.scheduleContrastRefresh()
+  onEasterEggActiveChanged: {
+    easterEggAnimation.stop()
+    root.easterEggProgress = 0
+    if (root.easterEggActive && !root.settings.reducedMotion)
+      easterEggAnimation.restart()
+  }
 
   function colorHex(value) {
     function channel(number) {
@@ -785,7 +801,8 @@ Item {
           || parsed.clockFormat === undefined
           || parsed.defaultFromCurrency === undefined
           || parsed.defaultToCurrency === undefined
-          || parsed.rateStaleDays === undefined) {
+          || parsed.rateStaleDays === undefined
+          || parsed.reducedMotion === undefined) {
         root.settingsMigrationWritten = true
         configFile.setText(JSON.stringify(root.settings, null, 2) + "\n")
       }
@@ -830,6 +847,8 @@ Item {
     } else if (item.id === "history") {
       root.updateSettings({ historyMode: CalcModel.wrappedChoice(root.historyChoices,
         root.settings.historyMode, delta) })
+    } else if (item.id === "motion") {
+      root.updateSettings({ reducedMotion: !root.settings.reducedMotion })
     } else {
       var settingName = item.id === "from-currency" ? "defaultFromCurrency" : "defaultToCurrency"
       var otherName = item.id === "from-currency" ? "defaultToCurrency" : "defaultFromCurrency"
@@ -879,7 +898,7 @@ Item {
 
   function addCurrentToHistory() {
     // Selected text is intentionally session-only and never written to history.
-    if (root.transformActive) return
+    if (root.transformActive || root.resultKind === "easter-egg") return
     if (root.settings.historyMode === "disabled" || !root.expression.trim() || !root.result) return
     root.history = CalcModel.addHistoryEntry(root.history, {
       expression: root.expression.trim(),
@@ -1538,6 +1557,16 @@ Item {
     onTriggered: root.startEvaluation()
   }
 
+  NumberAnimation {
+    id: easterEggAnimation
+    target: root
+    property: "easterEggProgress"
+    from: 0
+    to: 1
+    duration: 680
+    easing.type: Easing.OutCubic
+  }
+
   Timer {
     id: installerPoll
     interval: 2000
@@ -1866,6 +1895,7 @@ Item {
       padding: root.contentMargin
 
       Behavior on height {
+        enabled: !root.settings.reducedMotion
         NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
       }
 
@@ -2170,12 +2200,12 @@ Item {
 
             Text {
               id: rateMetadata
-              visible: root.rateSummary.length > 0
+              visible: root.rateSummary.length > 0 || root.easterEggActive
               width: visible ? Math.min(implicitWidth, Style.space(220)) : 0
               anchors.right: copyResultHint.left
               anchors.rightMargin: visible ? Style.spacing.md : 0
               anchors.verticalCenter: parent.verticalCenter
-              text: root.rateSummary
+              text: root.easterEggActive ? "Fast by design." : root.rateSummary
               color: root.rateStale ? root.urgent : root.foreground
               opacity: root.rateStale ? 0.9 : 0.5
               font.family: root.fontFamily
@@ -2200,6 +2230,29 @@ Item {
               font.weight: Font.Bold
               horizontalAlignment: Text.AlignLeft
               elide: Text.ElideRight
+            }
+
+            Repeater {
+              model: 4
+
+              delegate: Rectangle {
+                id: easterEggSpark
+                required property int index
+                readonly property real phase: Math.max(0, Math.min(1,
+                  (root.easterEggProgress - index * 0.07) / 0.79))
+                readonly property real angle: index * Math.PI / 2 - Math.PI / 4
+                width: Style.space(5)
+                height: width
+                radius: width / 2
+                x: resultValue.x + Math.min(resultValue.paintedWidth, resultValue.width) / 2
+                  + Math.cos(angle) * Style.space(31) * phase - width / 2
+                y: parent.height / 2 + Math.sin(angle) * Style.space(23) * phase - height / 2
+                color: root.accent
+                opacity: root.easterEggActive && !root.settings.reducedMotion
+                  ? Math.sin(phase * Math.PI) * 0.78 : 0
+                scale: 0.45 + phase * 0.7
+                z: 2
+              }
             }
 
             MouseArea {
