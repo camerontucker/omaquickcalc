@@ -278,8 +278,10 @@ Item {
     return "An existing unowned launcher entry was left untouched. A shortcut is optional."
   }
   readonly property string displayResult: CalcModel.singleLine(result)
-  readonly property bool easterEggActive: resultKind === "easter-egg"
-    && normalizedExpression.toLowerCase() === "quattro"
+  readonly property string easterEggName: resultKind === "easter-egg"
+    ? normalizedExpression.toLowerCase() : ""
+  readonly property bool easterEggActive: easterEggName.length > 0
+  readonly property bool quattroEasterEggActive: easterEggName === "quattro"
   readonly property string rateSummary: {
     if (resultKind !== "currency" || !rateDate) return ""
     if (rateStatusOverride) return rateStatusOverride
@@ -2172,6 +2174,9 @@ Item {
 
           Item {
             id: resultContent
+            readonly property real motifCenterX: resultValue.x
+              + Math.min(resultValue.paintedWidth, resultValue.width) / 2
+            readonly property real motifCenterY: height / 2
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: resultDivider.bottom
@@ -2237,24 +2242,149 @@ Item {
             }
 
             Repeater {
+              id: quattroMotif
               model: 4
 
               delegate: Rectangle {
-                id: easterEggSpark
+                id: quattroSpark
                 required property int index
-                readonly property real phase: Math.max(0, Math.min(1,
-                  (root.easterEggProgress - index * 0.07) / 0.79))
+                readonly property real phase: root.settings.reducedMotion ? 1
+                  : Math.max(0, Math.min(1,
+                    (root.easterEggProgress - index * 0.07) / 0.79))
                 readonly property real angle: index * Math.PI / 2 - Math.PI / 4
                 width: Style.space(5)
                 height: width
                 radius: width / 2
-                x: resultValue.x + Math.min(resultValue.paintedWidth, resultValue.width) / 2
+                x: resultContent.motifCenterX
                   + Math.cos(angle) * Style.space(31) * phase - width / 2
-                y: parent.height / 2 + Math.sin(angle) * Style.space(23) * phase - height / 2
+                y: resultContent.motifCenterY
+                  + Math.sin(angle) * Style.space(23) * phase - height / 2
                 color: root.accent
-                opacity: root.easterEggActive && !root.settings.reducedMotion
-                  ? Math.sin(phase * Math.PI) * 0.78 : 0
+                opacity: root.quattroEasterEggActive
+                  ? (root.settings.reducedMotion ? 0.5
+                    : Math.sin(phase * Math.PI) * 0.78) : 0
                 scale: 0.45 + phase * 0.7
+                z: 2
+              }
+            }
+
+            Rectangle {
+              id: eulerOrbit
+              readonly property real angle: root.settings.reducedMotion ? -Math.PI / 4
+                : root.easterEggProgress * Math.PI * 2 - Math.PI / 2
+              width: Style.space(5)
+              height: width
+              radius: width / 2
+              x: resultContent.motifCenterX + Math.cos(angle) * Style.space(35) - width / 2
+              y: resultContent.motifCenterY + Math.sin(angle) * Style.space(21) - height / 2
+              color: root.accent
+              opacity: root.easterEggName === "euler"
+                ? (root.settings.reducedMotion ? 0.52
+                  : Math.sin(root.easterEggProgress * Math.PI) * 0.78) : 0
+              z: 2
+            }
+
+            Repeater {
+              id: fibonacciMotif
+              model: 4
+
+              delegate: Rectangle {
+                id: fibonacciDot
+                required property int index
+                readonly property int sequenceValue: [1, 1, 2, 3][index]
+                readonly property real phase: root.settings.reducedMotion ? 1
+                  : Math.max(0, Math.min(1,
+                    (root.easterEggProgress - index * 0.1) / 0.46))
+                width: Style.space(3 + sequenceValue * 1.6)
+                height: width
+                radius: width / 2
+                x: resultContent.motifCenterX - Style.space(29)
+                  + index * Style.space(18) - width / 2
+                y: resultContent.motifCenterY + Style.space(18) - height / 2
+                color: root.accent
+                opacity: root.easterEggName === "fibonacci"
+                  ? (root.settings.reducedMotion ? 0.46
+                    : Math.sin(phase * Math.PI) * 0.7) : 0
+                scale: root.settings.reducedMotion ? 1 : 0.25 + phase * 0.75
+                z: 2
+              }
+            }
+
+            Repeater {
+              id: gaussMotif
+              model: 4
+
+              delegate: Rectangle {
+                id: gaussPair
+                required property int index
+                readonly property real progress: root.settings.reducedMotion
+                  ? 1 : root.easterEggProgress
+                readonly property real startOffset: [-58, -38, 38, 58][index]
+                readonly property real endOffset: [-19, -7, 7, 19][index]
+                readonly property real logicalOffset: startOffset
+                  + (endOffset - startOffset) * progress
+                readonly property real pixelOffset: logicalOffset < 0
+                  ? -Style.space(-logicalOffset) : Style.space(logicalOffset)
+                width: Style.space(8)
+                height: Math.max(1, Style.space(2))
+                radius: height / 2
+                x: resultContent.motifCenterX + pixelOffset - width / 2
+                y: resultContent.motifCenterY
+                  + (index % 2 === 0 ? -Style.space(9) : Style.space(9)) - height / 2
+                color: root.accent
+                opacity: root.easterEggName === "gauss"
+                  ? (root.settings.reducedMotion ? 0.48
+                    : Math.sin(progress * Math.PI) * 0.72) : 0
+                z: 2
+              }
+            }
+
+            Repeater {
+              id: ramanujanMotif
+              model: 4
+
+              delegate: Text {
+                id: ramanujanCube
+                required property int index
+                readonly property real progress: root.settings.reducedMotion
+                  ? 1 : root.easterEggProgress
+                x: resultContent.motifCenterX - Style.space(29)
+                  + index * Style.space(19) - width / 2
+                y: resultContent.motifCenterY
+                  + (index % 2 === 0 ? -Style.space(20) : Style.space(11)) - height / 2
+                text: "³"
+                color: root.accent
+                opacity: root.easterEggName === "ramanujan"
+                  ? (root.settings.reducedMotion ? 0.5
+                    : Math.sin(progress * Math.PI) * 0.74) : 0
+                rotation: root.settings.reducedMotion ? 0 : (progress - 0.5) * 70
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                z: 2
+              }
+            }
+
+            Repeater {
+              id: dhhMotif
+              model: 2
+
+              delegate: Rectangle {
+                id: dhhSignal
+                required property int index
+                readonly property real phase: root.settings.reducedMotion ? 1
+                  : Math.max(0, Math.min(1,
+                    (root.easterEggProgress - index * 0.13) / 0.72))
+                width: Style.space(15 + phase * 34 + index * 8)
+                height: width
+                radius: width / 2
+                x: resultContent.motifCenterX - width / 2
+                y: resultContent.motifCenterY - height / 2
+                color: "transparent"
+                border.width: Math.max(1, Style.space(1))
+                border.color: root.accent
+                opacity: root.easterEggName === "dhh"
+                  ? (root.settings.reducedMotion ? 0.28 - index * 0.06
+                    : Math.sin(phase * Math.PI) * (0.56 - index * 0.1)) : 0
                 z: 2
               }
             }

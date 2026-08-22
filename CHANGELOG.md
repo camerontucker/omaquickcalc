@@ -36,4 +36,5 @@
 - Replace the marketplace preview with the normal calculator experience and
   remove the obsolete demo video.
 - Add a tiny set of name-based Easter eggs with copyable results, a subtle
-  keyboard-help clue, four Quattro sparks, and a reduced-motion preference.
+  keyboard-help clue, distinct theme-aware micro-interactions, and static
+  reduced-motion variants.

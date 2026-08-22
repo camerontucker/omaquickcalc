@@ -173,9 +173,14 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_quattro_easter_egg_stays_subtle_and_copyable(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
-        self.assertIn('normalizedExpression.toLowerCase() === "quattro"', qml)
+        self.assertIn('readonly property string easterEggName:', qml)
+        self.assertIn('readonly property bool quattroEasterEggActive:', qml)
         self.assertIn('text: root.resultNote || root.rateSummary', qml)
-        self.assertIn('model: 4', qml)
+        for motif in (
+            'id: quattroMotif', 'id: eulerOrbit', 'id: fibonacciMotif',
+            'id: gaussMotif', 'id: ramanujanMotif', 'id: dhhMotif',
+        ):
+            self.assertIn(motif, qml)
         self.assertIn('!root.settings.reducedMotion', qml)
         self.assertIn('Behavior on height {\n        enabled: !root.settings.reducedMotion', qml)
         self.assertIn('root.resultKind === "easter-egg"', qml)

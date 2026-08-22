@@ -71,11 +71,11 @@ class StructuredEvaluatorTests(unittest.TestCase):
     def test_name_easter_eggs_are_local_and_copyable(self, run):
         expected = {
             "  QuAtTrO  ": ("4", "Fast by design."),
-            "Euler": ("2.718281828459045", "The natural choice."),
+            "Euler": ("2.718281828459045", "eⁱπ + 1 = 0"),
             "Fibonacci": ("1, 1, 2, 3, 5, 8, 13, 21", "The pattern continues."),
             "Gauss": ("5050", "Pair the ends."),
-            "Ramanujan": ("1729", "Two cubes, twice."),
-            "DHH": ("37", "Signals received."),
+            "Ramanujan": ("1729", "1³ + 12³ = 9³ + 10³"),
+            "DHH": ("37", "Convention over configuration."),
         }
         for expression, (value, note) in expected.items():
             with self.subTest(expression=expression):

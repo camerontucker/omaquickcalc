@@ -43,11 +43,11 @@ class Evaluation:
 
 EASTER_EGGS = {
     "quattro": ("4", "Fast by design."),
-    "euler": ("2.718281828459045", "The natural choice."),
+    "euler": ("2.718281828459045", "eⁱπ + 1 = 0"),
     "fibonacci": ("1, 1, 2, 3, 5, 8, 13, 21", "The pattern continues."),
     "gauss": ("5050", "Pair the ends."),
-    "ramanujan": ("1729", "Two cubes, twice."),
-    "dhh": ("37", "Signals received."),
+    "ramanujan": ("1729", "1³ + 12³ = 9³ + 10³"),
+    "dhh": ("37", "Convention over configuration."),
 }
 
 
