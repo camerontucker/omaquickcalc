@@ -25,6 +25,7 @@ Item {
   property bool resultDynamic: false
   property string resultColor: ""
   property var resultFormats: []
+  property string resultNote: ""
   property string rateDate: ""
   property string rateSource: ""
   property int rateAgeDays: -1
@@ -277,7 +278,8 @@ Item {
     return "An existing unowned launcher entry was left untouched. A shortcut is optional."
   }
   readonly property string displayResult: CalcModel.singleLine(result)
-  readonly property bool easterEggActive: resultKind === "easter-egg" && result === "4"
+  readonly property bool easterEggActive: resultKind === "easter-egg"
+    && normalizedExpression.toLowerCase() === "quattro"
   readonly property string rateSummary: {
     if (resultKind !== "currency" || !rateDate) return ""
     if (rateStatusOverride) return rateStatusOverride
@@ -773,6 +775,7 @@ Item {
     root.resultDynamic = false
     root.resultColor = ""
     root.resultFormats = []
+    root.resultNote = ""
     root.rateDate = ""
     root.rateSource = ""
     root.rateAgeDays = -1
@@ -1099,6 +1102,7 @@ Item {
         root.resultDynamic = Boolean(payload.dynamic)
         root.resultColor = String(payload.colorHex || "")
         root.resultFormats = Array.isArray(payload.formats) ? payload.formats : []
+        root.resultNote = String(payload.note || "")
         root.rateDate = String(payload.rateDate || "")
         root.rateSource = String(payload.rateSource || "")
         root.rateAgeDays = Number(payload.rateAgeDays === undefined ? -1 : payload.rateAgeDays)
@@ -2200,12 +2204,12 @@ Item {
 
             Text {
               id: rateMetadata
-              visible: root.rateSummary.length > 0 || root.easterEggActive
+              visible: root.rateSummary.length > 0 || root.resultNote.length > 0
               width: visible ? Math.min(implicitWidth, Style.space(220)) : 0
               anchors.right: copyResultHint.left
               anchors.rightMargin: visible ? Style.spacing.md : 0
               anchors.verticalCenter: parent.verticalCenter
-              text: root.easterEggActive ? "Fast by design." : root.rateSummary
+              text: root.resultNote || root.rateSummary
               color: root.rateStale ? root.urgent : root.foreground
               opacity: root.rateStale ? 0.9 : 0.5
               font.family: root.fontFamily
@@ -2458,7 +2462,8 @@ Item {
               readOnly: true
               selectByMouse: true
               wrapMode: TextEdit.Wrap
-              text: root.errorText || (root.result + (root.rateSummary ? "\n\n" + root.rateSummary : ""))
+              text: root.errorText || (root.result
+                + (root.resultNote || root.rateSummary ? "\n\n" + (root.resultNote || root.rateSummary) : ""))
               color: root.errorText ? root.urgent : root.foreground
               selectionColor: Style.selectionFill
               selectedTextColor: root.foreground
@@ -2760,7 +2765,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            text: "Ctrl+? or Escape closes this guide"
+            text: "Some names calculate too · Ctrl+? or Escape closes this guide"
             color: root.foreground
             opacity: 0.42
             font.family: root.fontFamily

@@ -38,6 +38,17 @@ class Evaluation:
     rateSource: str = ""
     rateAgeDays: int = -1
     rateStale: bool = False
+    note: str = ""
+
+
+EASTER_EGGS = {
+    "quattro": ("4", "Fast by design."),
+    "euler": ("2.718281828459045", "The natural choice."),
+    "fibonacci": ("1, 1, 2, 3, 5, 8, 13, 21", "The pattern continues."),
+    "gauss": ("5050", "Pair the ends."),
+    "ramanujan": ("1729", "Two cubes, twice."),
+    "dhh": ("37", "Signals received."),
+}
 
 
 ZONE_ALIASES = {
@@ -143,10 +154,13 @@ def clean_name(value: str) -> str:
 
 
 def easter_egg_evaluation(expression: str) -> Evaluation | None:
-    if clean_name(expression) != "quattro":
+    name = clean_name(expression)
+    egg = EASTER_EGGS.get(name)
+    if egg is None:
         return None
-    return Evaluation(True, "4", "4", kind="easter-egg",
-                      normalizedExpression="quattro")
+    result, note = egg
+    return Evaluation(True, result, result, kind="easter-egg",
+                      normalizedExpression=name, note=note)
 
 
 def local_zone() -> tzinfo:

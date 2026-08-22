@@ -173,13 +173,14 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_quattro_easter_egg_stays_subtle_and_copyable(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
-        self.assertIn('resultKind === "easter-egg" && result === "4"', qml)
-        self.assertIn('text: root.easterEggActive ? "Fast by design."', qml)
+        self.assertIn('normalizedExpression.toLowerCase() === "quattro"', qml)
+        self.assertIn('text: root.resultNote || root.rateSummary', qml)
         self.assertIn('model: 4', qml)
         self.assertIn('!root.settings.reducedMotion', qml)
         self.assertIn('Behavior on height {\n        enabled: !root.settings.reducedMotion', qml)
         self.assertIn('root.resultKind === "easter-egg"', qml)
         self.assertIn('root.queueCopy(evaluatedResult, keepOpen)', qml)
+        self.assertIn('Some names calculate too', qml)
 
 
 if __name__ == "__main__":

@@ -68,12 +68,23 @@ class NaturalLanguageTests(unittest.TestCase):
 
 class StructuredEvaluatorTests(unittest.TestCase):
     @patch("omaquickcalc_backend.subprocess.run")
-    def test_quattro_easter_egg_is_local_and_copies_four(self, run):
-        result = backend.evaluate("  QuAtTrO  ")
-        self.assertTrue(result.ok)
-        self.assertEqual(result.result, "4")
-        self.assertEqual(result.rawResult, "4")
-        self.assertEqual(result.kind, "easter-egg")
+    def test_name_easter_eggs_are_local_and_copyable(self, run):
+        expected = {
+            "  QuAtTrO  ": ("4", "Fast by design."),
+            "Euler": ("2.718281828459045", "The natural choice."),
+            "Fibonacci": ("1, 1, 2, 3, 5, 8, 13, 21", "The pattern continues."),
+            "Gauss": ("5050", "Pair the ends."),
+            "Ramanujan": ("1729", "Two cubes, twice."),
+            "DHH": ("37", "Signals received."),
+        }
+        for expression, (value, note) in expected.items():
+            with self.subTest(expression=expression):
+                result = backend.evaluate(expression)
+                self.assertTrue(result.ok)
+                self.assertEqual(result.result, value)
+                self.assertEqual(result.rawResult, value)
+                self.assertEqual(result.kind, "easter-egg")
+                self.assertEqual(result.note, note)
         run.assert_not_called()
 
     def test_design_and_duration_calculations(self):
