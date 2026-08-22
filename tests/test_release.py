@@ -40,7 +40,9 @@ class ReleaseContractTests(unittest.TestCase):
             "LICENSE",
             "README.md",
             "SECURITY.md",
+            "data/tax_schemes.json",
             "manifest.json",
+            "omaquickcalc_tax.py",
             "preview.png",
         ):
             with self.subTest(path=relative_path):
@@ -95,11 +97,12 @@ class ReleaseContractTests(unittest.TestCase):
             "argparse", "calendar", "colorsys", "dataclasses", "datetime", "decimal",
             "fractions", "json", "locale", "math", "os", "pathlib", "re",
             "secrets", "shlex", "stat", "subprocess", "sys", "tempfile",
-            "time", "unicodedata", "zoneinfo", "__future__",
+            "time", "typing", "unicodedata", "zoneinfo", "__future__",
+            "omaquickcalc_tax",
         }
         for relative_path in (
             "omaquickcalc_backend.py", "omaquickcalc_contrast.py", "omaquickcalc_setup.py",
-            "omaquickcalc_transform.py",
+            "omaquickcalc_tax.py", "omaquickcalc_transform.py",
         ):
             tree = ast.parse((REPOSITORY / relative_path).read_text(encoding="utf-8"))
             imported = {
@@ -185,6 +188,26 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('root.transformActive ? "↵ Replace" : "↵ Copy"', qml)
         self.assertIn("Math.round(Style.font.heading * 1.5)", qml)
         self.assertIn('onClicked: root.submit("copy-close")', qml)
+
+    def test_idle_capability_examples_reuse_the_result_row(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn("id: capabilityExamplesTimer", qml)
+        self.assertIn("interval: 3000", qml)
+        self.assertIn("readonly property bool capabilityExamplesVisible:", qml)
+        self.assertIn("readonly property bool resultRowReserved: capabilityExamplesVisible", qml)
+        self.assertIn("root.scheduleCapabilityExamples()", qml)
+        self.assertIn("visible: !root.capabilityExamplesVisible", qml)
+        self.assertIn("id: capabilityExampleRow", qml)
+        success_body = qml.split("if (payload.ok && payload.result)", 1)[1].split(
+            "} else {", 1
+        )[0]
+        self.assertIn("root.capabilityExamplesReady = false", success_body)
+        for example in ("20% off 125", "100 CAD in USD", "1pm pacific", "1000 tax"):
+            self.assertIn(f'"{example}"', qml)
+
+        close_body = qml.split("function close()", 1)[1].split("function dismiss()", 1)[0]
+        self.assertIn("capabilityExamplesTimer.stop()", close_body)
+        self.assertIn("root.capabilityExamplesReady = false", close_body)
 
     def test_time_format_is_available_in_preferences(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")

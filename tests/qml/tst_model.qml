@@ -48,6 +48,21 @@ TestCase {
       "auto")
   }
 
+  function test_tax_location_defaults_to_auto_and_validates_supported_regions() {
+    compare(Model.parseSettings("{}").taxLocation, "auto")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { taxLocation: "ca-mb" }).taxLocation,
+      "CA-MB")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { taxLocation: "CA-ON" }).taxLocation,
+      "CA-ON")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { taxLocation: "not-a-place" }).taxLocation,
+      "auto")
+    compare(Model.patchSettings(Model.parseSettings("{}"), {
+      taxLocation: "custom", taxCustomRate: 8.25
+    }).taxLocation, "custom")
+    compare(Model.patchSettings(Model.parseSettings("{}"), { taxCustomRate: 125 }).taxCustomRate,
+      100)
+  }
+
   function test_choice_navigation_wraps() {
     var choices = ["first", "second", "third"]
     compare(Model.wrappedChoice(choices, "first", -1), "third")

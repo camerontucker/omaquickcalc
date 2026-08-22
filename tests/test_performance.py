@@ -16,7 +16,8 @@ BACKEND = REPOSITORY / "omaquickcalc_backend.py"
 @unittest.skipUnless(shutil.which("qalc"), "qalc is required for the release latency budget")
 class EvaluationLatencyTests(unittest.TestCase):
     def test_warm_backend_stays_inside_modal_ui_budget(self):
-        expressions = ("1000 + 123", "64px in rem", "100 CAD in USD", "1pm pst")
+        expressions = ("1000 + 123", "64px in rem", "100 CAD in USD", "1pm pst",
+                       "900 + 100 tax")
         with tempfile.TemporaryDirectory() as directory:
             environment = os.environ.copy()
             environment.update({

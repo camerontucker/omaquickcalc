@@ -26,6 +26,7 @@ Item {
   property string resultColor: ""
   property var resultFormats: []
   property string resultNote: ""
+  property var resultReport: ({})
   property string rateDate: ""
   property string rateSource: ""
   property int rateAgeDays: -1
@@ -35,6 +36,7 @@ Item {
   property string statusText: ""
   property string pendingAction: ""
   property string activeAction: ""
+  property bool capabilityExamplesReady: false
 
   property var settings: CalcModel.parseSettings("{}")
   property var history: []
@@ -165,7 +167,15 @@ Item {
   readonly property int cornerRadius: Style.cornerRadius
   readonly property int contentMargin: Style.space(18)
   readonly property int rowContentHeight: Math.max(Style.space(36), Style.font.heading + Style.space(8))
-  readonly property bool resultRowReserved: expression.trim().length > 0
+  readonly property var capabilityExamples: [
+    "20% off 125", "100 CAD in USD", "1pm pacific", "1000 tax"
+  ]
+  readonly property bool capabilityExamplesVisible: capabilityExamplesReady
+    && opened && backendAvailable && !setupOpen && !transformActive
+    && result.length === 0 && errorText.length === 0
+    && !historyOpen && !detailOpen && !actionMenuOpen && !helpOpen && !preferencesOpen
+  readonly property bool resultRowReserved: capabilityExamplesVisible
+    || expression.trim().length > 0
     || (transformActive && transformOperand.trim().length > 0)
   readonly property int resultRowHeight: resultRowReserved ? Style.space(68) : 0
   readonly property int baseCardHeight: rowContentHeight + resultRowHeight + contentMargin * 2
@@ -175,15 +185,25 @@ Item {
     ? Style.space(54) + Math.max(1, visibleHistoryRows) * Style.space(42) + Style.space(26)
     : 0
   readonly property int detailExtraHeight: detailOpen ? Style.space(194) : 0
+  readonly property bool taxReportAvailable: resultKind === "tax"
+    && resultReport && resultReport.sections
+    && resultReport.sections.length > 0
+  readonly property bool taxReportReserved: (resultKind === "tax"
+    || /\s(?:sales\s+)?tax(?:\s+(?:in\s+.+|at\s+\d+(?:[.,]\d+)?\s*%))?$/i
+      .test(calculationExpression())) && !historyOpen && !detailOpen
+    && !actionMenuOpen && !helpOpen && !preferencesOpen
+  readonly property bool taxReportVisible: taxReportAvailable && !historyOpen && !detailOpen
+    && !actionMenuOpen && !helpOpen && !preferencesOpen
+  readonly property int taxReportExtraHeight: taxReportReserved ? Style.space(210) : 0
   readonly property int actionExtraHeight: actionMenuOpen
     ? Style.space(14) + Math.min(7, Math.max(1, actionItems.length)) * Style.space(42) + Style.space(26)
     : 0
   readonly property int helpExtraHeight: helpOpen ? Style.space(330) : 0
-  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(330) : 0
+  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(370) : 0
   readonly property int cardWidth: Math.min(Style.space(720), panel.width - Style.gapsOut * 2)
   readonly property int cardHeight: setupOpen ? Style.space(380) : baseCardHeight
     + Math.max(historyExtraHeight, detailExtraHeight, actionExtraHeight,
-      helpExtraHeight, preferencesExtraHeight)
+      helpExtraHeight, preferencesExtraHeight, taxReportExtraHeight)
   readonly property string pluginId: (manifest && manifest.id)
     || "io.github.camerontucker.omaquickcalc"
   readonly property string pluginVersion: (manifest && manifest.version) || "0"
@@ -198,6 +218,9 @@ Item {
     { id: "motion", label: "Motion", value: settings.reducedMotion ? "Reduced" : "Full" },
     { id: "clock-format", label: "Time format", value: settings.clockFormat === "12"
       ? "12-hour" : (settings.clockFormat === "24" ? "24-hour" : "System") },
+    { id: "tax-location", label: "Tax location", value: taxLocationLabel },
+    { id: "tax-custom-rate", label: "Custom tax rate",
+      value: Number(settings.taxCustomRate).toFixed(2).replace(/\.00$/, "") + "%" },
     { id: "from-currency", label: "Default source currency", value: settings.defaultFromCurrency },
     { id: "to-currency", label: "Default target currency", value: settings.defaultToCurrency }
   ]
@@ -218,6 +241,28 @@ Item {
   readonly property var currencyChoices: [
     "USD", "CAD", "EUR", "GBP", "JPY", "AUD", "NZD", "CHF", "CNY", "INR"
   ]
+  readonly property var taxLocationChoices: [
+    "auto", "custom", "CA-AB", "CA-BC", "CA-MB", "CA-NB", "CA-NL", "CA-NS", "CA-NT",
+    "CA-NU", "CA-ON", "CA-PE", "CA-QC", "CA-SK", "CA-YT", "AU", "NZ", "GB",
+    "DE", "FR", "IT", "ES", "PL", "NL", "IN", "CN", "JP", "MX", "SG", "ZA",
+    "SA", "AE"
+  ]
+  readonly property var taxLocationLabels: ({
+    "CA-AB": "Alberta", "CA-BC": "British Columbia", "CA-MB": "Manitoba",
+    "CA-NB": "New Brunswick", "CA-NL": "Newfoundland & Labrador",
+    "CA-NS": "Nova Scotia", "CA-NT": "Northwest Territories", "CA-NU": "Nunavut",
+    "CA-ON": "Ontario", "CA-PE": "Prince Edward Island", "CA-QC": "Quebec",
+    "CA-SK": "Saskatchewan", "CA-YT": "Yukon", "AU": "Australia",
+    "NZ": "New Zealand", "GB": "United Kingdom", "DE": "Germany", "FR": "France",
+    "IT": "Italy", "ES": "Spain", "PL": "Poland", "NL": "Netherlands", "IN": "India",
+    "CN": "China", "JP": "Japan", "MX": "Mexico", "SG": "Singapore",
+    "ZA": "South Africa", "SA": "Saudi Arabia", "AE": "United Arab Emirates"
+  })
+  readonly property string taxLocationLabel: settings.taxLocation === "auto"
+    ? (resultReport && resultReport.locationName
+      ? "Auto · " + String(resultReport.locationName) : "Auto")
+    : (settings.taxLocation === "custom" ? "Custom combined rate"
+      : String(taxLocationLabels[settings.taxLocation] || settings.taxLocation))
   readonly property var setupItems: {
     if (setupPage === "dependencies") return [
       {
@@ -361,7 +406,10 @@ Item {
   }
 
   onExpressionChanged: {
-    if (root.opened && !root.setupOpen) root.scheduleEvaluation()
+    if (root.opened && !root.setupOpen) {
+      root.scheduleEvaluation()
+      root.scheduleCapabilityExamples()
+    }
   }
 
   onSettingsChanged: {
@@ -528,6 +576,8 @@ Item {
     root.transformOriginPid = 0
     root.transformOriginTerminal = false
     root.installRequested = false
+    capabilityExamplesTimer.stop()
+    root.capabilityExamplesReady = false
     evaluationTimer.stop()
     root.evaluationGeneration += 1
     root.pendingExpression = ""
@@ -591,6 +641,7 @@ Item {
 
   function focusCalculator() {
     root.setupOpen = false
+    root.scheduleCapabilityExamples()
     Qt.callLater(function() {
       expressionInput.forceActiveFocus()
       expressionInput.selectAll()
@@ -638,6 +689,18 @@ Item {
     if (/^[+-]?\d+(?:\.\d+)?%\s+tip$/i.test(query)) return query + " on " + operand
     if (/^in\s+/i.test(query)) return operand + " to " + query.replace(/^in\s+/i, "")
     return operand + " " + query
+  }
+
+  function scheduleCapabilityExamples() {
+    capabilityExamplesTimer.stop()
+    if (!root.opened || root.setupOpen || root.transformActive) {
+      root.capabilityExamplesReady = false
+      return
+    }
+    if (root.expression.trim().length === 0) {
+      root.capabilityExamplesReady = false
+      capabilityExamplesTimer.restart()
+    }
   }
 
   function beginShortcutSetup() {
@@ -872,6 +935,7 @@ Item {
     root.resultColor = ""
     root.resultFormats = []
     root.resultNote = ""
+    root.resultReport = ({})
     root.rateDate = ""
     root.rateSource = ""
     root.rateAgeDays = -1
@@ -901,6 +965,8 @@ Item {
           || parsed.clockFormat === undefined
           || parsed.defaultFromCurrency === undefined
           || parsed.defaultToCurrency === undefined
+          || parsed.taxLocation === undefined
+          || parsed.taxCustomRate === undefined
           || parsed.rateStaleDays === undefined
           || parsed.reducedMotion === undefined) {
         root.settingsMigrationWritten = true
@@ -952,6 +1018,12 @@ Item {
     } else if (item.id === "clock-format") {
       root.updateSettings({ clockFormat: CalcModel.wrappedChoice(root.clockFormatChoices,
         root.settings.clockFormat, delta) })
+    } else if (item.id === "tax-location") {
+      root.updateSettings({ taxLocation: CalcModel.wrappedChoice(root.taxLocationChoices,
+        root.settings.taxLocation, delta) })
+    } else if (item.id === "tax-custom-rate") {
+      root.updateSettings({ taxCustomRate: Math.max(0, Math.min(100,
+        Math.round((Number(root.settings.taxCustomRate) + delta * 0.25) * 100) / 100)) })
     } else {
       var settingName = item.id === "from-currency" ? "defaultFromCurrency" : "defaultToCurrency"
       var otherName = item.id === "from-currency" ? "defaultToCurrency" : "defaultFromCurrency"
@@ -1175,6 +1247,8 @@ Item {
       "--clock-format", root.settings.clockFormat,
       "--default-from", root.settings.defaultFromCurrency,
       "--default-to", root.settings.defaultToCurrency,
+      "--tax-location", root.settings.taxLocation,
+      "--tax-custom-rate", String(root.settings.taxCustomRate),
       "--rate-stale-days", String(root.settings.rateStaleDays),
       "--rem-px", String(root.settings.remPx),
       "--workday-hours", String(root.settings.workdayHours)
@@ -1194,6 +1268,7 @@ Item {
       try { payload = JSON.parse(nextResult || "{}") } catch (error) { payload = ({}) }
 
       if (payload.ok && payload.result) {
+        root.capabilityExamplesReady = false
         root.result = String(payload.result)
         root.rawResult = String(payload.rawResult || payload.result)
         root.resultKind = String(payload.kind || "math")
@@ -1203,6 +1278,8 @@ Item {
         root.resultColor = String(payload.colorHex || "")
         root.resultFormats = Array.isArray(payload.formats) ? payload.formats : []
         root.resultNote = String(payload.note || "")
+        root.resultReport = payload.report && typeof payload.report === "object"
+          ? payload.report : ({})
         root.rateDate = String(payload.rateDate || "")
         root.rateSource = String(payload.rateSource || "")
         root.rateAgeDays = Number(payload.rateAgeDays === undefined ? -1 : payload.rateAgeDays)
@@ -1347,6 +1424,9 @@ Item {
         items.push({ id: "swap", label: "Swap Units", value: root.swapExpression, enabled: true })
       if (root.resultKind === "currency")
         items.push({ id: "refresh-currency", label: "Refresh Currency Rates", value: root.rateDate, enabled: true })
+      if (root.resultKind === "tax" && root.resultReport.copyText)
+        items.push({ id: "copy-report", label: "Copy Tax Report", value: "",
+          enabled: root.clipboardAvailable })
       for (var index = 0; index < root.resultFormats.length; index += 1) {
         var format = root.resultFormats[index]
         items.push({ id: "format", label: "Copy " + String(format.label), value: String(format.value),
@@ -1387,6 +1467,7 @@ Item {
     if (action.id === "copy") root.copyText(root.result, false)
     else if (action.id === "replace-selection") root.completeAction("replace-selection")
     else if (action.id === "copy-raw" || action.id === "format") root.copyText(action.value, false)
+    else if (action.id === "copy-report") root.copyText(root.resultReport.copyText, false)
     else if (action.id === "copy-equation") {
       root.copyText(root.calculationExpression() + " = " + root.result, false)
     } else if (action.id === "reuse") root.completeAction("reuse")
@@ -1679,6 +1760,17 @@ Item {
     interval: 200
     repeat: false
     onTriggered: root.startEvaluation()
+  }
+
+  Timer {
+    id: capabilityExamplesTimer
+    interval: 3000
+    repeat: false
+    onTriggered: {
+      if (root.opened && !root.setupOpen && !root.transformActive
+          && root.expression.trim().length === 0)
+        root.capabilityExamplesReady = true
+    }
   }
 
   NumberAnimation {
@@ -2341,6 +2433,7 @@ Item {
 
             Text {
               id: resultValue
+              visible: !root.capabilityExamplesVisible
               anchors.left: resultColorSwatch.visible ? resultColorSwatch.right : parent.left
               anchors.leftMargin: resultColorSwatch.visible ? Style.spacing.md : 0
               anchors.right: rateMetadata.visible ? rateMetadata.left : copyResultHint.left
@@ -2359,6 +2452,39 @@ Item {
               font.weight: root.result.length > 0 ? Font.Bold : Font.Normal
               horizontalAlignment: Text.AlignLeft
               elide: Text.ElideRight
+            }
+
+            Row {
+              id: capabilityExampleRow
+              visible: root.capabilityExamplesVisible
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(8)
+
+              Text {
+                text: "Try"
+                color: root.foreground
+                opacity: 0.42
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                font.weight: Font.DemiBold
+              }
+
+              Repeater {
+                model: root.capabilityExamples
+
+                delegate: Text {
+                  id: capabilityExample
+                  required property int index
+                  required property string modelData
+                  text: (index > 0 ? "·  " : "") + modelData
+                  color: root.foreground
+                  opacity: 0.66
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+              }
             }
 
             Repeater {
@@ -2515,6 +2641,143 @@ Item {
               cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
               onClicked: root.submit("copy-close")
             }
+          }
+        }
+
+        Item {
+          id: taxReportPane
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: resultRow.bottom
+          anchors.topMargin: Style.space(12)
+          anchors.bottom: parent.bottom
+          visible: root.taxReportVisible && !root.setupOpen
+
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(1, Style.space(1))
+            color: root.border
+            opacity: 0.65
+          }
+
+          Row {
+            id: taxSectionsRow
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.topMargin: Style.space(10)
+            anchors.bottom: taxReportFooter.top
+            anchors.bottomMargin: Style.space(7)
+            spacing: Style.space(10)
+            property int sectionCount: root.taxReportAvailable
+              ? root.resultReport.sections.length : 0
+
+            Repeater {
+              model: root.taxReportAvailable ? root.resultReport.sections : []
+
+              delegate: Item {
+                id: taxSection
+                required property int index
+                required property var modelData
+                width: (taxSectionsRow.width
+                  - taxSectionsRow.spacing * Math.max(0, taxSectionsRow.sectionCount - 1))
+                  / Math.max(1, taxSectionsRow.sectionCount)
+                height: taxSectionsRow.height
+
+                Rectangle {
+                  visible: taxSection.index > 0
+                  anchors.left: parent.left
+                  anchors.top: parent.top
+                  anchors.bottom: parent.bottom
+                  width: Math.max(1, Style.space(1))
+                  color: root.border
+                  opacity: 0.45
+                }
+
+                Column {
+                  anchors.left: parent.left
+                  anchors.leftMargin: taxSection.index > 0 ? Style.space(10) : 0
+                  anchors.right: parent.right
+                  anchors.top: parent.top
+                  spacing: Style.space(3)
+
+                  Text {
+                    width: parent.width
+                    text: String(taxSection.modelData.title || "")
+                    color: root.accent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                  }
+
+                  Repeater {
+                    model: taxSection.modelData.rows
+                      ? taxSection.modelData.rows : []
+
+                    delegate: Item {
+                      id: taxReportRow
+                      required property var modelData
+                      width: taxSection.width - (taxSection.index > 0 ? Style.space(10) : 0)
+                      height: Style.space(25)
+
+                      Text {
+                        anchors.left: parent.left
+                        anchors.right: taxReportValue.left
+                        anchors.rightMargin: Style.spacing.sm
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: String(taxReportRow.modelData.label || "")
+                        color: root.foreground
+                        opacity: taxReportRow.modelData.emphasis ? 0.92 : 0.58
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.caption
+                        font.weight: taxReportRow.modelData.emphasis
+                          ? Font.DemiBold : Font.Normal
+                        elide: Text.ElideRight
+                      }
+
+                      Text {
+                        id: taxReportValue
+                        width: parent.width * 0.56
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: String(taxReportRow.modelData.value || "")
+                        color: taxReportRow.modelData.emphasis ? root.accent : root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                        font.weight: taxReportRow.modelData.emphasis ? Font.Bold : Font.Normal
+                        horizontalAlignment: Text.AlignRight
+                        elide: Text.ElideLeft
+                      }
+
+                      MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.copyText(taxReportRow.modelData.value, true)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          Text {
+            id: taxReportFooter
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            text: String(root.resultReport.assumption || "Standard taxable purchase")
+              + (root.resultReport.reviewedOn
+                ? " · rates reviewed " + String(root.resultReport.reviewedOn) : "")
+            color: root.foreground
+            opacity: 0.42
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
           }
         }
 
@@ -2714,7 +2977,12 @@ Item {
               selectByMouse: true
               wrapMode: TextEdit.Wrap
               text: root.errorText || (root.result
-                + (root.resultNote || root.rateSummary ? "\n\n" + (root.resultNote || root.rateSummary) : ""))
+                ? (root.resultKind === "tax" && root.resultReport.detailText
+                  ? String(root.resultReport.detailText)
+                  : root.result
+                    + (root.resultNote || root.rateSummary
+                      ? "\n\n" + (root.resultNote || root.rateSummary) : ""))
+                : "")
               color: root.errorText ? root.urgent : root.foreground
               selectionColor: Style.selectionFill
               selectedTextColor: root.foreground
@@ -2929,7 +3197,7 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            text: "↑↓ select   ←→ change   Ctrl+, close   Any ISO currency remains valid in config.json"
+            text: "↑↓ select   ←→ change   Ctrl+, close   Tax uses the standard taxable rate"
             color: root.foreground
             opacity: 0.42
             font.family: root.fontFamily

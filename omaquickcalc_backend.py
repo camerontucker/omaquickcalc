@@ -21,6 +21,8 @@ from fractions import Fraction
 from pathlib import Path
 from zoneinfo import ZoneInfo, available_timezones
 
+import omaquickcalc_tax as tax_engine
+
 
 @dataclass
 class Evaluation:
@@ -40,6 +42,7 @@ class Evaluation:
     rateStale: bool = False
     note: str = ""
     pending: bool = False
+    report: dict[str, object] = field(default_factory=dict)
 
 
 EASTER_EGGS = {
@@ -951,17 +954,115 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
                       rateAgeDays=rate_age, rateStale=rate_stale)
 
 
+def tax_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output: bool,
+                   digit_grouping: int, precision: int, default_from: str,
+                   default_to: str, rate_stale_days: int,
+                   tax_location: str = "auto", tax_custom_rate: float = 0) -> Evaluation | None:
+    query = tax_engine.parse_tax_query(expression)
+    if query is None:
+        return None
+    amount_expression = re.sub(r"(?<!\w)[$€£¥₹](?=\s*[+\-]?\d)", "",
+                               query.amount_expression)
+    if (re.search(r"[+\-*/^%]\s*$", amount_expression)
+            or amount_expression.count("(") != amount_expression.count(")")):
+        return Evaluation(False, kind="tax", pending=True,
+                          normalizedExpression=expression)
+
+    amount: Decimal | None = None
+    if (re.fullmatch(r"[+\-\d\s_'.,]+", amount_expression)
+            and re.search(r"\d", amount_expression)):
+        amount = parse_localized_amount(amount_expression)
+
+    if amount is None:
+        base = qalc_evaluation(amount_expression, qalc, timeout_ms, unicode_output,
+                               digit_grouping, precision, default_from, default_to,
+                               rate_stale_days)
+        if not base.ok:
+            if base.pending and re.search(r"[A-Za-z°µμ]", amount_expression):
+                return Evaluation(False, error="Tax requires a unitless numeric amount", kind="tax",
+                                  normalizedExpression=expression)
+            return Evaluation(False, error=base.error, kind="tax", pending=base.pending,
+                              normalizedExpression=expression)
+        if base.kind != "math" or not re.fullmatch(r"[+\-\d\s_'. ,Ee]+", base.rawResult):
+            return Evaluation(False, error="Tax requires a unitless numeric amount", kind="tax",
+                              normalizedExpression=expression)
+        try:
+            amount = Decimal(base.rawResult.replace(" ", "").replace(",", ""))
+        except InvalidOperation:
+            return Evaluation(False, error="Tax requires a unitless numeric amount", kind="tax",
+                              normalizedExpression=expression)
+
+    if not amount.is_finite() or amount.copy_abs() > Decimal("1e100"):
+        return Evaluation(False, error="Tax amount is out of range", kind="tax",
+                          normalizedExpression=expression)
+
+    try:
+        catalog = tax_engine.load_catalog()
+        requested_location = query.location or tax_location
+        custom_rate = Decimal(query.custom_rate) if query.custom_rate else Decimal(str(tax_custom_rate))
+        if query.custom_rate or str(requested_location).lower() == "custom":
+            if not custom_rate.is_finite() or custom_rate <= 0 or custom_rate > 100:
+                return Evaluation(False, error="Set a custom tax rate in Preferences", kind="tax",
+                                  normalizedExpression=expression)
+            jurisdiction = {
+                "id": "CUSTOM",
+                "name": f"Custom {tax_engine.rate_text(custom_rate / 100)}",
+                "countryCode": "",
+                "currency": default_from.upper()
+                if re.fullmatch(r"[A-Za-z]{3}", default_from) else "USD",
+                "components": [{"code": "Tax", "rate": tax_engine.decimal_text(custom_rate / 100)}],
+                "assumption": "Custom combined rate; actual taxability depends on the location and purchase",
+                "sources": [],
+            }
+            inferred = False
+            catalog = {**catalog, "reviewedOn": ""}
+        else:
+            jurisdiction, inferred = tax_engine.resolve_jurisdiction(requested_location, catalog)
+        if jurisdiction is None:
+            if query.location or str(tax_location).lower() not in {"", "auto"}:
+                return Evaluation(False, error=f"Unsupported tax location: {requested_location}",
+                                  kind="tax", normalizedExpression=expression)
+            return Evaluation(False, error="Choose a tax location in Preferences", kind="tax",
+                              normalizedExpression=expression)
+        report = tax_engine.build_report(amount, jurisdiction, catalog, inferred)
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+        return Evaluation(False, error="Tax scheme data is unavailable", kind="tax",
+                          normalizedExpression=expression)
+
+    location_note = str(report["locationName"])
+    if report.get("locationInferred"):
+        location_note += " · Auto"
+    return Evaluation(
+        True,
+        str(report["result"]),
+        str(report["rawResult"]),
+        kind="tax",
+        normalizedExpression=expression,
+        dynamic=True,
+        formats=list(report.get("formats", [])),
+        note=location_note,
+        report=report,
+    )
+
+
 def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
              unicode_output: bool = True, digit_grouping: int = 0,
              rem_px: float = 16, workday_hours: float = 8,
              clock_format: str = DEFAULT_CLOCK_FORMAT, precision: int = 10,
              default_from: str = "USD", default_to: str = "CAD",
-             rate_stale_days: int = 7) -> Evaluation:
+             rate_stale_days: int = 7, tax_location: str = "auto",
+             tax_custom_rate: float = 0) -> Evaluation:
     text = expression.strip()
     if not text:
         return Evaluation(False, error="No expression")
     precision = max(2, min(50, int(precision)))
     rate_stale_days = max(1, min(365, int(rate_stale_days)))
+
+    tax_result = tax_evaluation(text, qalc, timeout_ms, unicode_output, digit_grouping,
+                                precision, default_from, default_to, rate_stale_days,
+                                tax_location, tax_custom_rate)
+    if tax_result is not None:
+        return tax_result
 
     for evaluator in (
         easter_egg_evaluation,
@@ -999,6 +1100,8 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--default-from", default="USD")
     parser.add_argument("--default-to", default="CAD")
     parser.add_argument("--rate-stale-days", type=int, default=7)
+    parser.add_argument("--tax-location", default="auto")
+    parser.add_argument("--tax-custom-rate", type=float, default=0)
     return parser.parse_args()
 
 
@@ -1014,7 +1117,8 @@ def main() -> int:
             result = evaluate(str(expression), args.qalc, args.timeout_ms, bool(args.unicode),
                               args.digit_grouping, args.rem_px, args.workday_hours,
                               args.clock_format, args.precision, args.default_from,
-                              args.default_to, args.rate_stale_days)
+                              args.default_to, args.rate_stale_days, args.tax_location,
+                              args.tax_custom_rate)
             payload.append({"expression": str(expression), **asdict(result)})
         print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
         return 0
@@ -1022,7 +1126,8 @@ def main() -> int:
     result = evaluate(args.expression, args.qalc, args.timeout_ms, bool(args.unicode),
                       args.digit_grouping, args.rem_px, args.workday_hours,
                       args.clock_format, args.precision, args.default_from,
-                      args.default_to, args.rate_stale_days)
+                      args.default_to, args.rate_stale_days, args.tax_location,
+                      args.tax_custom_rate)
     print(json.dumps(asdict(result), ensure_ascii=False, separators=(",", ":")))
     return 0 if result.ok else 1
 

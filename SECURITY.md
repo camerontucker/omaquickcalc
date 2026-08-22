@@ -57,5 +57,9 @@ refresh setting is enabled.
 that runs with the user's privileges, so it should point only to a trusted
 calculator binary.
 
+Tax location Auto detection reads only the existing system locale and timezone.
+Tax schemes and their source metadata are bundled with the plugin; tax
+calculations do not perform IP lookup, geolocation, or network requests.
+
 OmaQuickCalc does not install sudoers rules, request passwordless privileges,
 download executable code, or store credentials.

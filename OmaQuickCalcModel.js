@@ -1,7 +1,7 @@
 .pragma library
 
 var defaults = {
-  version: 3,
+  version: 4,
   historyMode: "persistent",
   historyLimit: 100,
   historyRetentionDays: 90,
@@ -16,6 +16,8 @@ var defaults = {
   clockFormat: "12",
   defaultFromCurrency: "USD",
   defaultToCurrency: "CAD",
+  taxLocation: "auto",
+  taxCustomRate: 0,
   rateStaleDays: 7,
   refreshExchangeRates: true,
   backgroundOpacity: 0.92,
@@ -65,8 +67,21 @@ function parseSettings(raw) {
   if (!/^[A-Z]{3}$/.test(fromCurrency)) fromCurrency = defaults.defaultFromCurrency
   if (!/^[A-Z]{3}$/.test(toCurrency)) toCurrency = defaults.defaultToCurrency
 
+  var taxLocation = String(parsed.taxLocation || defaults.taxLocation)
+  if (["auto", "custom"].indexOf(taxLocation.toLowerCase()) >= 0)
+    taxLocation = taxLocation.toLowerCase()
+  else {
+    taxLocation = taxLocation.toUpperCase()
+    if ([
+      "CA-AB", "CA-BC", "CA-MB", "CA-NB", "CA-NL", "CA-NS", "CA-NT",
+      "CA-NU", "CA-ON", "CA-PE", "CA-QC", "CA-SK", "CA-YT", "AU", "NZ",
+      "GB", "DE", "FR", "IT", "ES", "PL", "NL", "IN", "CN", "JP", "MX",
+      "SG", "ZA", "SA", "AE"
+    ].indexOf(taxLocation) < 0) taxLocation = defaults.taxLocation
+  }
+
   return {
-    version: 3,
+    version: 4,
     historyMode: mode,
     historyLimit: boundedInteger(parsed.historyLimit, defaults.historyLimit, 1, 1000),
     historyRetentionDays: boundedInteger(parsed.historyRetentionDays,
@@ -82,6 +97,8 @@ function parseSettings(raw) {
     clockFormat: clockFormat,
     defaultFromCurrency: fromCurrency,
     defaultToCurrency: toCurrency,
+    taxLocation: taxLocation,
+    taxCustomRate: boundedNumber(parsed.taxCustomRate, defaults.taxCustomRate, 0, 100),
     rateStaleDays: boundedInteger(parsed.rateStaleDays, defaults.rateStaleDays, 1, 365),
     refreshExchangeRates: parsed.refreshExchangeRates === undefined
       ? defaults.refreshExchangeRates : Boolean(parsed.refreshExchangeRates),

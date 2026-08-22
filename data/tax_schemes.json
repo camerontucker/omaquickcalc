@@ -1,0 +1,326 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-08-22",
+  "assumption": "Standard taxable purchase",
+  "jurisdictions": [
+    {
+      "id": "CA-AB",
+      "name": "Alberta",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["ab", "alberta"],
+      "components": [{"code": "GST", "rate": "0.05"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2008-01-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-BC",
+      "name": "British Columbia",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["bc", "b.c.", "british columbia"],
+      "components": [{"code": "GST", "rate": "0.05"}, {"code": "PST", "rate": "0.07"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2013-04-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-MB",
+      "name": "Manitoba",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["mb", "manitoba"],
+      "components": [{"code": "GST", "rate": "0.05"}, {"code": "PST", "rate": "0.07"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2019-07-01",
+      "sources": [
+        "https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html",
+        "https://www.gov.mb.ca/finance/taxation/taxes/retail.html"
+      ]
+    },
+    {
+      "id": "CA-NB",
+      "name": "New Brunswick",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["nb", "n.b.", "new brunswick"],
+      "components": [{"code": "HST", "rate": "0.15"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2016-07-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-NL",
+      "name": "Newfoundland and Labrador",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["nl", "n.l.", "newfoundland", "newfoundland and labrador"],
+      "components": [{"code": "HST", "rate": "0.15"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2016-07-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-NS",
+      "name": "Nova Scotia",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["ns", "n.s.", "nova scotia"],
+      "components": [{"code": "HST", "rate": "0.14"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2025-04-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-NT",
+      "name": "Northwest Territories",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["nt", "nwt", "northwest territories"],
+      "components": [{"code": "GST", "rate": "0.05"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2008-01-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-NU",
+      "name": "Nunavut",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["nu", "nunavut"],
+      "components": [{"code": "GST", "rate": "0.05"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2008-01-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-ON",
+      "name": "Ontario",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["on", "ont", "ontario"],
+      "components": [{"code": "HST", "rate": "0.13"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2010-07-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-PE",
+      "name": "Prince Edward Island",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["pe", "pei", "p.e.i.", "prince edward island"],
+      "components": [{"code": "HST", "rate": "0.15"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2016-10-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "CA-QC",
+      "name": "Quebec",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["qc", "pq", "quebec", "québec"],
+      "components": [{"code": "GST", "rate": "0.05"}, {"code": "QST", "rate": "0.09975"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2013-01-01",
+      "sources": [
+        "https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html",
+        "https://www.revenuquebec.ca/en/businesses/consumption-taxes/gsthst-and-qst/basic-rules-for-applying-the-gsthst-and-qst/tables-of-gst-and-qst-rates/"
+      ]
+    },
+    {
+      "id": "CA-SK",
+      "name": "Saskatchewan",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["sk", "sask", "saskatchewan"],
+      "components": [{"code": "GST", "rate": "0.05"}, {"code": "PST", "rate": "0.06"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2017-03-23",
+      "sources": [
+        "https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html",
+        "https://www.saskatchewan.ca/business/taxes-licensing-and-reporting/provincial-taxes-policies-and-bulletins"
+      ]
+    },
+    {
+      "id": "CA-YT",
+      "name": "Yukon",
+      "countryCode": "CA",
+      "currency": "CAD",
+      "aliases": ["yt", "yukon"],
+      "components": [{"code": "GST", "rate": "0.05"}],
+      "federalReverse": {"code": "GST", "rate": "0.05"},
+      "effectiveFrom": "2008-01-01",
+      "sources": ["https://www.canada.ca/en/revenue-agency/services/tax/businesses/topics/gst-hst-businesses/charge-collect-which-rate/calculator.html"]
+    },
+    {
+      "id": "AU",
+      "name": "Australia",
+      "countryCode": "AU",
+      "currency": "AUD",
+      "aliases": ["au", "australia"],
+      "components": [{"code": "GST", "rate": "0.10"}],
+      "effectiveFrom": "2000-07-01",
+      "sources": ["https://www.ato.gov.au/businesses-and-organisations/gst-excise-and-indirect-taxes/gst"]
+    },
+    {
+      "id": "NZ",
+      "name": "New Zealand",
+      "countryCode": "NZ",
+      "currency": "NZD",
+      "aliases": ["nz", "new zealand"],
+      "components": [{"code": "GST", "rate": "0.15"}],
+      "effectiveFrom": "2010-10-01",
+      "sources": ["https://www.ird.govt.nz/gst/charging-gst"]
+    },
+    {
+      "id": "GB",
+      "name": "United Kingdom",
+      "countryCode": "GB",
+      "currency": "GBP",
+      "aliases": ["gb", "uk", "united kingdom", "great britain", "britain"],
+      "components": [{"code": "VAT", "rate": "0.20"}],
+      "effectiveFrom": "2011-01-04",
+      "sources": ["https://www.gov.uk/vat-rates"]
+    },
+    {
+      "id": "DE",
+      "name": "Germany",
+      "countryCode": "DE",
+      "currency": "EUR",
+      "aliases": ["de", "germany", "deutschland"],
+      "components": [{"code": "VAT", "rate": "0.19"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "FR",
+      "name": "France",
+      "countryCode": "FR",
+      "currency": "EUR",
+      "aliases": ["fr", "france"],
+      "components": [{"code": "VAT", "rate": "0.20"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "IT",
+      "name": "Italy",
+      "countryCode": "IT",
+      "currency": "EUR",
+      "aliases": ["it", "italy", "italia"],
+      "components": [{"code": "VAT", "rate": "0.22"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "ES",
+      "name": "Spain",
+      "countryCode": "ES",
+      "currency": "EUR",
+      "aliases": ["es", "spain", "espana", "españa"],
+      "components": [{"code": "VAT", "rate": "0.21"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "PL",
+      "name": "Poland",
+      "countryCode": "PL",
+      "currency": "PLN",
+      "aliases": ["pl", "poland", "polska"],
+      "components": [{"code": "VAT", "rate": "0.23"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "NL",
+      "name": "Netherlands",
+      "countryCode": "NL",
+      "currency": "EUR",
+      "aliases": ["nl", "netherlands", "the netherlands", "holland"],
+      "components": [{"code": "VAT", "rate": "0.21"}],
+      "sources": ["https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm"]
+    },
+    {
+      "id": "IN",
+      "name": "India",
+      "countryCode": "IN",
+      "currency": "INR",
+      "aliases": ["in", "india"],
+      "assumption": "18% standard GST profile; the actual slab depends on the goods or services",
+      "components": [{"code": "GST", "rate": "0.18"}],
+      "effectiveFrom": "2017-07-01",
+      "sources": ["https://cbic-gst.gov.in/gst-goods-services-rates.html"]
+    },
+    {
+      "id": "CN",
+      "name": "China",
+      "countryCode": "CN",
+      "currency": "CNY",
+      "aliases": ["cn", "china", "prc"],
+      "assumption": "13% standard goods VAT profile; other supplies can use 9% or 6%",
+      "components": [{"code": "VAT", "rate": "0.13"}],
+      "effectiveFrom": "2019-04-01",
+      "sources": ["https://www.chinatax.gov.cn/eng/c102962/c102968/c102969/c5245967/content.html"]
+    },
+    {
+      "id": "JP",
+      "name": "Japan",
+      "countryCode": "JP",
+      "currency": "JPY",
+      "aliases": ["jp", "japan"],
+      "assumption": "Standard taxable purchase; qualifying food and newspapers use a reduced rate",
+      "components": [{"code": "Consumption tax", "rate": "0.10"}],
+      "effectiveFrom": "2019-10-01",
+      "sources": ["https://www.nta.go.jp/english/taxes/consumption_tax/01.htm"]
+    },
+    {
+      "id": "MX",
+      "name": "Mexico",
+      "countryCode": "MX",
+      "currency": "MXN",
+      "aliases": ["mx", "mexico", "méxico"],
+      "components": [{"code": "IVA", "rate": "0.16"}],
+      "effectiveFrom": "2010-01-01",
+      "sources": ["https://wwwmat.sat.gob.mx/articulo/19848/articulo-1"]
+    },
+    {
+      "id": "SG",
+      "name": "Singapore",
+      "countryCode": "SG",
+      "currency": "SGD",
+      "aliases": ["sg", "singapore"],
+      "components": [{"code": "GST", "rate": "0.09"}],
+      "effectiveFrom": "2024-01-01",
+      "sources": ["https://www.iras.gov.sg/taxes/goods-services-tax-(gst)/charging-gst-(output-tax)/when-to-charge-goods-and-services-tax-(gst)/prevailing-rate-of-9"]
+    },
+    {
+      "id": "ZA",
+      "name": "South Africa",
+      "countryCode": "ZA",
+      "currency": "ZAR",
+      "aliases": ["za", "south africa"],
+      "components": [{"code": "VAT", "rate": "0.15"}],
+      "effectiveFrom": "2018-04-01",
+      "sources": ["https://www.sars.gov.za/types-of-tax/value-added-tax/"]
+    },
+    {
+      "id": "SA",
+      "name": "Saudi Arabia",
+      "countryCode": "SA",
+      "currency": "SAR",
+      "aliases": ["sa", "saudi arabia", "ksa"],
+      "components": [{"code": "VAT", "rate": "0.15"}],
+      "effectiveFrom": "2020-07-01",
+      "sources": ["https://zatca.gov.sa/en/RulesRegulations/VAT/Pages/About_Vat.aspx"]
+    },
+    {
+      "id": "AE",
+      "name": "United Arab Emirates",
+      "countryCode": "AE",
+      "currency": "AED",
+      "aliases": ["ae", "uae", "united arab emirates", "emirates"],
+      "components": [{"code": "VAT", "rate": "0.05"}],
+      "effectiveFrom": "2018-01-01",
+      "sources": ["https://tax.gov.ae/en/faq.aspx"]
+    }
+  ]
+}

@@ -20,6 +20,8 @@ keyboard-first, single-floating-input experience and keep changes scoped.
   Keep it free of Node-only APIs.
 - `omaquickcalc_backend.py` normalizes natural-language calculator phrases and returns
   structured results from Qalculate.
+- `omaquickcalc_tax.py` and `data/tax_schemes.json` own local consumption-tax
+  parsing, location resolution, sourced rates, rounding, and structured reports.
 - `omaquickcalc_setup.py` owns the optional, consent-based Hyprland binding and
   reversible launcher lifecycle operations.
 - `omaquickcalc_transform.py` owns explicit numeric-selection capture, private

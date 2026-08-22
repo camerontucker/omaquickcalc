@@ -40,6 +40,14 @@ in Place can put it there.
 Also try `20% off 125`, `square root of 625`, `18% tip on 80`, or
 `1pm pacific` to convert directly to your local time.
 
+Type `1000 tax` for a local consumption-tax report. In Canada, the report shows
+tax added to the amount, all applicable taxes reversed from that amount as the
+total, and GST alone reversed from the total. A trailing tax modifier applies
+to the complete calculation, so `900 + 100 tax` produces the same report.
+Override the saved location inline with a query such as `1000 tax in Ontario`.
+Address-dependent schemes can use a saved custom combined rate or an inline
+query such as `1000 tax at 8.25%`.
+
 ## Transform in Place
 
 Highlight `100 CAD`, summon OmaQuickCalc, and type `in USD`. Press `Enter` to
@@ -86,7 +94,7 @@ Omarchy plugins run as unsandboxed user code. Review the
 
 ## Configuration
 
-Set history, precision, currencies, clock format, rate freshness, REM and
+Set history, precision, currencies, tax location, clock format, rate freshness, REM and
 workday bases, and background transparency in
 `~/.config/omaquickcalc/config.json`. See the
 [configuration reference](docs/CONFIGURATION.md).

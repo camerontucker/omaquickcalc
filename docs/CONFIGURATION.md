@@ -2,7 +2,7 @@
 
 OmaQuickCalc creates `$XDG_CONFIG_HOME/omaquickcalc/config.json`, falling back
 to `~/.config/omaquickcalc/config.json`. Press `Ctrl+,` in OmaQuickCalc to
-change card opacity, history mode, motion, time format, and common default currency pairs.
+change card opacity, history mode, motion, time format, tax location, and common default currency pairs.
 Edit the JSON file for advanced values or any other ISO currency; changes
 reload live.
 
@@ -10,7 +10,7 @@ The generated defaults are:
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "historyMode": "persistent",
   "historyLimit": 100,
   "historyRetentionDays": 90,
@@ -25,6 +25,8 @@ The generated defaults are:
   "clockFormat": "12",
   "defaultFromCurrency": "USD",
   "defaultToCurrency": "CAD",
+  "taxLocation": "auto",
+  "taxCustomRate": 0,
   "rateStaleDays": 7,
   "refreshExchangeRates": true,
   "backgroundOpacity": 0.92,
@@ -39,7 +41,7 @@ The generated defaults are:
 
 | Setting | Accepted values | Effect |
 | --- | --- | --- |
-| `version` | `3` | Current configuration schema. |
+| `version` | `4` | Current configuration schema. |
 | `historyMode` | `persistent`, `session`, `disabled` | Save history across launches, keep it only for this shell session, or record nothing. |
 | `historyLimit` | `1`–`1000` | Maximum number of retained entries. |
 | `historyRetentionDays` | `1`–`3650` | Age limit for unpinned persistent entries. |
@@ -54,6 +56,8 @@ The generated defaults are:
 | `clockFormat` | `12`, `24`, `auto` | Display format for times and timezone answers; new installs default to 12-hour time. |
 | `defaultFromCurrency` | three-letter code | Source used when an expression contains only a target currency. |
 | `defaultToCurrency` | three-letter code | Target used when an expression contains only a source currency. |
+| `taxLocation` | `auto` or a supported ISO country/subdivision code | Jurisdiction used by trailing `tax` queries. Auto uses only the system locale and timezone. Examples include `CA-MB`, `CA-ON`, `GB`, `DE`, `IN`, and `JP`. |
+| `taxCustomRate` | `0`–`100` | Combined percentage used when `taxLocation` is `custom`; `0` requires a rate to be chosen before calculating. |
 | `rateStaleDays` | `1`–`365` | Age after which cached exchange rates are marked stale. |
 | `refreshExchangeRates` | `true`, `false` | Allow Qalculate's daily exchange-rate update behavior. |
 | `backgroundOpacity` | `0`–`1` | Floating card opacity; text contrast follows the wallpaper beneath the card automatically. |
@@ -64,6 +68,29 @@ The generated defaults are:
 
 Invalid or out-of-range values fall back to safe defaults or are clamped to
 the supported range.
+
+## Tax reports
+
+`1000 tax` uses the configured location. `900 + 100 tax` first evaluates the
+complete arithmetic expression, then produces the same report. A location in
+the query, such as `1000 tax in Ontario` or `1000 tax in Germany`, overrides the
+preference without changing it.
+
+For address-dependent schemes such as US sales tax, select **Custom combined
+rate** in preferences and set the local percentage, or write it inline as
+`1000 tax at 8.25%`. Custom reports use the default source currency.
+
+Canada includes every province and territory and reports the applicable
+GST/PST/QST or HST components. Standard national VAT/GST profiles are also
+bundled for Australia, New Zealand, the United Kingdom, selected large EU
+countries, India, China, Japan, Mexico, Singapore, South Africa, Saudi Arabia,
+and the United Arab Emirates. India and China display a more specific
+assumption because their applicable rates depend strongly on the supply.
+
+Reports assume a standard taxable purchase. Product exemptions, reduced or
+zero rates, place-of-supply exceptions, registration thresholds, and special
+local taxes can change the actual amount. Rates and official source URLs are
+bundled locally; Auto location never performs an IP or geolocation lookup.
 
 Currency answers are displayed and normally copied with two decimal places.
 The **Copy Unformatted** action and conversion swapping retain Qalculate's full

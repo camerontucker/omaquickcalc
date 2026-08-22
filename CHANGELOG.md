@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Show compact example calculations in the reserved result row after three
+  idle seconds, then hand the same space to the first successful calculation.
+- Add local, province-aware Canadian tax reports with add-tax, reverse-all-tax,
+  and GST-only reverse calculations.
+- Treat trailing `tax` as a modifier over the complete preceding expression, so
+  `900 + 100 tax` produces the same report as `1000 tax`.
+- Infer a default tax jurisdiction from the system locale and timezone, allow a
+  saved Tax location preference, and support inline overrides such as
+  `1000 tax in Ontario`.
+- Add sourced standard VAT/GST profiles for major national schemes, structured
+  report copy actions, and explicit standard-taxable-purchase assumptions.
+- Support saved and inline custom combined rates for address-dependent schemes.
+
 ## 0.5.0 — 2026-08-21
 
 - Add a discoverable Super + Space launcher entry that does not depend on
