@@ -136,6 +136,9 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('root.setupPage = "installing-dependencies"', qml)
         self.assertIn('root.continueAfterDependencies()', qml)
         self.assertIn("visible: !root.setupOpen", qml)
+        self.assertIn("dependencies installed. Returning to setup", qml)
+        self.assertIn("'{\\\"resumeSetup\\\":true}'", qml)
+        self.assertNotIn("Press Enter to close this terminal", qml)
 
     def test_shortcut_setup_uses_plain_language(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
