@@ -1,4 +1,5 @@
 import subprocess
+import sys
 import unittest
 from unittest.mock import patch
 
@@ -41,7 +42,7 @@ class NaturalLanguageTests(unittest.TestCase):
         self.assertEqual(backend.normalize_natural_language("500 to cad", "GBP", "USD"),
                          "500 GBP to CAD")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_unit_conversion_returns_a_swappable_expression(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "3.048 m\n", "")
         result = backend.evaluate("10ft in m")
@@ -49,7 +50,7 @@ class NaturalLanguageTests(unittest.TestCase):
         self.assertEqual(result.kind, "unit")
         self.assertEqual(result.swapExpression, "3.048 m to ft")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_currency_has_numeric_unformatted_result(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "£74.9475\n", "")
         result = backend.evaluate("100 usd in gbp")
@@ -59,21 +60,21 @@ class NaturalLanguageTests(unittest.TestCase):
         self.assertEqual(result.rawResult, "74.9475")
         self.assertEqual(result.swapExpression, "74.9475 GBP to USD")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_currency_rounds_half_up_and_preserves_grouping(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "$1,234.565\n", "")
         result = backend.evaluate("1700 cad in usd")
         self.assertEqual(result.result, "$1,234.57")
         self.assertEqual(result.rawResult, "1234.565")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_symbol_led_dollar_conversion_keeps_symbol_and_target_code(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "CAD 142.195\n", "")
         result = backend.evaluate("$100 in CAD")
         self.assertEqual(result.result, "CAD $142.20")
         self.assertEqual(result.rawResult, "142.195")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_arithmetic_is_evaluated_before_currency_formatting(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "$250\n", "")
         result = backend.evaluate("500 * 0.5 in usd")
@@ -87,7 +88,7 @@ class NaturalLanguageTests(unittest.TestCase):
 
 
 class StructuredEvaluatorTests(unittest.TestCase):
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_name_easter_eggs_are_local_and_copyable(self, run):
         expected = {
             "  QuAtTrO  ": ("4", "Fast by design."),
@@ -116,7 +117,7 @@ class StructuredEvaluatorTests(unittest.TestCase):
         self.assertEqual(backend.evaluate("90 mins to timespan").result, "1 hour 30 minutes")
         self.assertEqual(backend.evaluate("16 h in workdays").result, "2 workdays")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_incomplete_or_arbitrary_text_does_not_leak_qalculate_constants(self, run):
         for expression in ("50r", "50re", "10c", "10i", "quatt", "hello world"):
             with self.subTest(expression=expression):
@@ -144,6 +145,20 @@ class StructuredEvaluatorTests(unittest.TestCase):
         self.assertIn({"label": "Hexadecimal", "value": "0x400"}, integer)
         fraction = backend.numeric_formats("0.3333333333", 10)
         self.assertIn({"label": "Fraction", "value": "1/3"}, fraction)
+
+    def test_numeric_formats_do_not_expand_huge_scientific_results(self):
+        formats = backend.numeric_formats("9.900656229e301029", 10)
+        self.assertNotIn("Fraction", {item["label"] for item in formats})
+        self.assertNotIn("Binary", {item["label"] for item in formats})
+        self.assertNotIn("Octal", {item["label"] for item in formats})
+        self.assertNotIn("Hexadecimal", {item["label"] for item in formats})
+        self.assertTrue(all(len(item["value"]) <= backend.MAX_FORMAT_VALUE_CHARS
+                            for item in formats))
+
+    def test_expression_length_is_bounded_before_evaluation(self):
+        result = backend.evaluate("1" * (backend.MAX_EXPRESSION_LENGTH + 1))
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error, "Expression is too long")
 
     def test_clock_format_is_configurable(self):
         value = backend.datetime(2030, 1, 2, 17, 5, tzinfo=backend.timezone.utc)
@@ -209,6 +224,58 @@ class StructuredEvaluatorTests(unittest.TestCase):
                 result = backend.evaluate(expression)
                 self.assertFalse(result.ok)
                 self.assertEqual(result.error, "Calculation is out of range")
+
+
+class BoundedQalcProcessTests(unittest.TestCase):
+    def test_ordinary_process_output_is_collected(self):
+        process = backend._run_qalc_bounded(
+            [sys.executable, "-c", "print('4')"], 2.0
+        )
+        self.assertEqual(process.returncode, 0)
+        self.assertEqual(process.stdout, "4\n")
+        self.assertEqual(process.stderr, "")
+
+    def test_stdout_over_limit_terminates_the_process(self):
+        command = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stdout.buffer.write(b'x' * {backend.MAX_QALC_STDOUT_BYTES + 1})",
+        ]
+        with self.assertRaises(backend.QalcOutputLimitError):
+            backend._run_qalc_bounded(command, 2.0)
+
+    def test_stderr_over_limit_terminates_the_process(self):
+        command = [
+            sys.executable,
+            "-c",
+            f"import sys; sys.stderr.buffer.write(b'x' * {backend.MAX_QALC_STDERR_BYTES + 1})",
+        ]
+        with self.assertRaises(backend.QalcOutputLimitError):
+            backend._run_qalc_bounded(command, 2.0)
+
+    def test_child_address_space_is_limited(self):
+        command = [
+            sys.executable,
+            "-c",
+            "import resource; print(resource.getrlimit(resource.RLIMIT_AS)[0])",
+        ]
+        process = backend._run_qalc_bounded(command, 2.0)
+        self.assertEqual(process.returncode, 0)
+        self.assertLessEqual(int(process.stdout), backend.MAX_QALC_MEMORY_BYTES)
+
+    @patch("omaquickcalc_backend._run_qalc_bounded")
+    def test_large_qalc_result_is_rejected_before_parsing(self, run):
+        run.return_value = subprocess.CompletedProcess(
+            [], 0, "1" * (backend.MAX_RESULT_TEXT_BYTES + 1), ""
+        )
+        result = backend.evaluate("2^100")
+        self.assertFalse(result.ok)
+        self.assertEqual(result.error, "Calculation result is too large")
+
+    def test_json_payload_size_is_bounded(self):
+        self.assertIsNone(
+            backend.encode_json_payload({"result": "x" * 100}, byte_limit=16)
+        )
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@
 - Harden Transform in Place by rendering captured selections as plain text,
   bounding clipboard-owner output, and targeting replacement paste events to
   the verified originating window.
+- Bound calculator input, qalc memory and captured output, derived numeric
+  formats, and the final JSON response so oversized calculations fail safely.
 
 ## 0.6.0 — 2026-08-22
 

@@ -2311,6 +2311,7 @@ Item {
             verticalAlignment: TextInput.AlignVCenter
             clip: true
             text: root.expression
+            maximumLength: 4096
             color: root.foreground
             opacity: root.result.length > 0 ? 0.72 : 1
             selectionColor: Style.selectionFill

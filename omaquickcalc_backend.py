@@ -10,6 +10,8 @@ import locale
 import math
 import os
 import re
+import resource
+import selectors
 import subprocess
 import sys
 import unicodedata
@@ -19,6 +21,7 @@ from datetime import date, datetime, time, timedelta, timezone, tzinfo
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from fractions import Fraction
 from pathlib import Path
+from time import monotonic
 from zoneinfo import ZoneInfo, available_timezones
 
 import omaquickcalc_tax as tax_engine
@@ -55,6 +58,93 @@ EASTER_EGGS = {
 }
 
 DEFAULT_CLOCK_FORMAT = "12"
+
+MAX_EXPRESSION_LENGTH = 4096
+MAX_QALC_STDOUT_BYTES = 64 * 1024
+MAX_QALC_STDERR_BYTES = 16 * 1024
+MAX_QALC_MEMORY_BYTES = 256 * 1024 * 1024
+MAX_RESULT_TEXT_BYTES = 16 * 1024
+MAX_ERROR_TEXT_CHARS = 4096
+MAX_FORMAT_VALUE_CHARS = 4096
+MAX_INTEGER_FORMAT_DECIMAL_EXPONENT = 1000
+MAX_FRACTION_DIGITS = 512
+MAX_EVALUATION_JSON_BYTES = 128 * 1024
+MAX_BATCH_JSON_BYTES = 512 * 1024
+
+
+class QalcOutputLimitError(RuntimeError):
+    """Raised after terminating qalc for exceeding a captured-stream limit."""
+
+
+def _limit_qalc_address_space() -> None:
+    """Apply a child-only address-space ceiling before qalc starts."""
+    soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_AS)
+    desired_limit = MAX_QALC_MEMORY_BYTES
+    if hard_limit != resource.RLIM_INFINITY:
+        desired_limit = min(desired_limit, hard_limit)
+    if soft_limit == resource.RLIM_INFINITY or soft_limit > desired_limit:
+        resource.setrlimit(resource.RLIMIT_AS, (desired_limit, hard_limit))
+
+
+def _run_qalc_bounded(command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
+    """Run a direct argv command while bounding both captured pipes and child memory."""
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        preexec_fn=_limit_qalc_address_space,
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ, (bytearray(), MAX_QALC_STDOUT_BYTES))
+    selector.register(process.stderr, selectors.EVENT_READ, (bytearray(), MAX_QALC_STDERR_BYTES))
+    buffers = {
+        process.stdout: selector.get_key(process.stdout).data[0],
+        process.stderr: selector.get_key(process.stderr).data[0],
+    }
+    deadline = monotonic() + timeout
+
+    try:
+        while selector.get_map():
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            events = selector.select(remaining)
+            if not events:
+                raise subprocess.TimeoutExpired(command, timeout)
+            for key, _ in events:
+                stream = key.fileobj
+                buffer, byte_limit = key.data
+                chunk = os.read(stream.fileno(), min(65_536, byte_limit - len(buffer) + 1))
+                if not chunk:
+                    selector.unregister(stream)
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > byte_limit:
+                    raise QalcOutputLimitError("qalc output exceeded its byte limit")
+
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, timeout)
+        return_code = process.wait(timeout=remaining)
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+        raise
+    finally:
+        selector.close()
+        process.stdout.close()
+        process.stderr.close()
+
+    return subprocess.CompletedProcess(
+        command,
+        return_code,
+        buffers[process.stdout].decode("utf-8", errors="replace"),
+        buffers[process.stderr].decode("utf-8", errors="replace"),
+    )
 
 
 ZONE_ALIASES = {
@@ -797,36 +887,47 @@ def numeric_formats(value: str, precision: int) -> list[dict[str, str]]:
 
     digits = max(2, min(50, precision))
     output = []
+
+    def append_format(label: str, formatted: str) -> None:
+        if len(formatted) <= MAX_FORMAT_VALUE_CHARS:
+            output.append({"label": label, "value": formatted})
+
     scientific = f"{number:.{digits - 1}E}"
     mantissa, exponent = scientific.split("E")
     scientific = mantissa.rstrip("0").rstrip(".") + "e" + str(int(exponent))
     if scientific.lower() != cleaned.lower():
-        output.append({"label": "Scientific", "value": scientific})
+        append_format("Scientific", scientific)
 
     if number:
-        exponent_value = number.adjusted()
-        engineering_exponent = exponent_value - exponent_value % 3
-        engineering_mantissa = number.scaleb(-engineering_exponent)
-        engineering = f"{engineering_mantissa:.{digits}g}e{engineering_exponent}"
-        if engineering_exponent != 0 and engineering.lower() not in (cleaned.lower(), scientific.lower()):
-            output.append({"label": "Engineering", "value": engineering})
+        try:
+            exponent_value = number.adjusted()
+            engineering_exponent = exponent_value - exponent_value % 3
+            engineering_mantissa = number.scaleb(-engineering_exponent)
+            engineering = f"{engineering_mantissa:.{digits}g}e{engineering_exponent}"
+            if (engineering_exponent != 0
+                    and engineering.lower() not in (cleaned.lower(), scientific.lower())):
+                append_format("Engineering", engineering)
+        except (InvalidOperation, OverflowError, ValueError):
+            pass
 
-    fraction = Fraction(number).limit_denominator(1_000_000)
-    if fraction.denominator != 1:
-        approximation = Decimal(fraction.numerator) / Decimal(fraction.denominator)
-        tolerance = Decimal(10) ** -(min(digits, 15) - 1)
-        if abs(number - approximation) <= tolerance:
-            output.append({"label": "Fraction", "value": f"{fraction.numerator}/{fraction.denominator}"})
+    decimal_tuple = number.as_tuple()
+    if (len(decimal_tuple.digits) <= MAX_FRACTION_DIGITS
+            and abs(number.adjusted()) <= MAX_FRACTION_DIGITS):
+        fraction = Fraction(number).limit_denominator(1_000_000)
+        if fraction.denominator != 1:
+            approximation = Decimal(fraction.numerator) / Decimal(fraction.denominator)
+            tolerance = Decimal(10) ** -(min(digits, 15) - 1)
+            if abs(number - approximation) <= tolerance:
+                append_format("Fraction", f"{fraction.numerator}/{fraction.denominator}")
 
-    if number == number.to_integral_value():
+    if (number == number.to_integral_value()
+            and number.adjusted() <= MAX_INTEGER_FORMAT_DECIMAL_EXPONENT):
         integer = int(number)
         sign = "-" if integer < 0 else ""
         absolute = abs(integer)
-        output.extend([
-            {"label": "Binary", "value": sign + "0b" + format(absolute, "b")},
-            {"label": "Octal", "value": sign + "0o" + format(absolute, "o")},
-            {"label": "Hexadecimal", "value": sign + "0x" + format(absolute, "X")},
-        ])
+        append_format("Binary", sign + "0b" + format(absolute, "b"))
+        append_format("Octal", sign + "0o" + format(absolute, "o"))
+        append_format("Hexadecimal", sign + "0x" + format(absolute, "X"))
     return output
 
 
@@ -922,19 +1023,34 @@ def qalc_evaluation(expression: str, qalc: str, timeout_ms: int, unicode_output:
         "--", normalized,
     ]
     try:
-        process = subprocess.run(command, capture_output=True, text=True,
-                                 timeout=max(1.0, timeout_ms / 1000 + 0.75), check=False)
+        process = _run_qalc_bounded(command, max(1.0, timeout_ms / 1000 + 0.75))
     except FileNotFoundError:
         return Evaluation(False, error="Calculator engine unavailable", normalizedExpression=normalized)
     except subprocess.TimeoutExpired:
         return Evaluation(False, error="Calculation timed out", normalizedExpression=normalized)
+    except QalcOutputLimitError:
+        return Evaluation(False, error="Calculation result is too large",
+                          normalizedExpression=normalized)
 
+    if len(process.stdout.encode("utf-8")) > MAX_RESULT_TEXT_BYTES:
+        return Evaluation(False, error="Calculation result is too large",
+                          normalizedExpression=normalized)
     output = process.stdout.replace("\x1b", "").strip()
     error = process.stderr.strip()
+    resource_failure = process.returncode < 0 or re.search(
+        r"bad_alloc|cannot allocate memory|out of memory|memory exhausted",
+        error,
+        re.I,
+    )
+    if resource_failure:
+        return Evaluation(False, error="Calculation exceeded resource limit",
+                          normalizedExpression=normalized)
     if process.returncode != 0 or not output:
-        return Evaluation(False, error=error or output or "No result", normalizedExpression=normalized)
+        message = (error or output or "No result")[:MAX_ERROR_TEXT_CHARS]
+        return Evaluation(False, error=message, normalizedExpression=normalized)
     if re.search(r"(^|\n)\s*(warning|error):", output + "\n" + error, re.I):
-        return Evaluation(False, error=error or output, normalizedExpression=normalized)
+        return Evaluation(False, error=(error or output)[:MAX_ERROR_TEXT_CHARS],
+                          normalizedExpression=normalized)
     if suspicious_result(expression, normalized, output):
         return Evaluation(False, error="That phrase was not understood. Try explicit operators or 'to' for conversions.",
                           normalizedExpression=normalized)
@@ -1052,6 +1168,8 @@ def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
              default_from: str = "USD", default_to: str = "CAD",
              rate_stale_days: int = 7, tax_location: str = "auto",
              tax_custom_rate: float = 0) -> Evaluation:
+    if len(expression) > MAX_EXPRESSION_LENGTH:
+        return Evaluation(False, error="Expression is too long")
     text = expression.strip()
     if not text:
         return Evaluation(False, error="No expression")
@@ -1105,6 +1223,13 @@ def parse_arguments() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def encode_json_payload(payload: object, byte_limit: int) -> str | None:
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > byte_limit:
+        return None
+    return encoded
+
+
 def main() -> int:
     args = parse_arguments()
     if args.mode == "batch":
@@ -1120,7 +1245,11 @@ def main() -> int:
                               args.default_to, args.rate_stale_days, args.tax_location,
                               args.tax_custom_rate)
             payload.append({"expression": str(expression), **asdict(result)})
-        print(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+        encoded = encode_json_payload(payload, MAX_BATCH_JSON_BYTES)
+        if encoded is None:
+            print("[]")
+            return 1
+        print(encoded)
         return 0
 
     result = evaluate(args.expression, args.qalc, args.timeout_ms, bool(args.unicode),
@@ -1128,7 +1257,12 @@ def main() -> int:
                       args.clock_format, args.precision, args.default_from,
                       args.default_to, args.rate_stale_days, args.tax_location,
                       args.tax_custom_rate)
-    print(json.dumps(asdict(result), ensure_ascii=False, separators=(",", ":")))
+    encoded = encode_json_payload(asdict(result), MAX_EVALUATION_JSON_BYTES)
+    if encoded is None:
+        result = Evaluation(False, error="Calculation result is too large")
+        encoded = encode_json_payload(asdict(result), MAX_EVALUATION_JSON_BYTES)
+        assert encoded is not None
+    print(encoded)
     return 0 if result.ok else 1
 
 

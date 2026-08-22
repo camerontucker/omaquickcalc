@@ -121,7 +121,7 @@ class TaxEvaluationTests(unittest.TestCase):
             ],
         )
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_currency_symbols_are_accepted_as_amount_notation(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "1000\n", "")
         direct = backend.evaluate("$1000 tax", tax_location="CA-MB")
@@ -131,7 +131,7 @@ class TaxEvaluationTests(unittest.TestCase):
         self.assertEqual(arithmetic.result, "$1,120.00")
         self.assertEqual(run.call_args.args[0][-1], "900 + 100")
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_arithmetic_prefix_is_evaluated_before_tax(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "1000\n", "")
         result = backend.evaluate("900 + 100 tax", tax_location="CA-MB")
@@ -161,7 +161,7 @@ class TaxEvaluationTests(unittest.TestCase):
                 self.assertEqual(len(result.report["sections"]), 2)
                 self.assertEqual(result.report["sections"][0]["rows"][1]["label"], component)
 
-    @patch("omaquickcalc_backend.subprocess.run")
+    @patch("omaquickcalc_backend._run_qalc_bounded")
     def test_inline_and_preference_custom_rates_cover_local_combined_schemes(self, run):
         run.return_value = subprocess.CompletedProcess([], 0, "1000\n", "")
         inline = backend.evaluate("1000 tax at 8.25%", tax_location="auto")

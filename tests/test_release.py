@@ -95,7 +95,7 @@ class ReleaseContractTests(unittest.TestCase):
     def test_python_runtime_has_no_third_party_imports(self):
         standard_library = {
             "argparse", "calendar", "colorsys", "dataclasses", "datetime", "decimal",
-            "fractions", "json", "locale", "math", "os", "pathlib", "re",
+            "fractions", "json", "locale", "math", "os", "pathlib", "re", "resource",
             "secrets", "selectors", "shlex", "stat", "subprocess", "sys", "tempfile",
             "time", "typing", "unicodedata", "zoneinfo", "__future__",
             "omaquickcalc_tax",
@@ -162,6 +162,14 @@ class ReleaseContractTests(unittest.TestCase):
         transform = (REPOSITORY / "omaquickcalc_transform.py").read_text(encoding="utf-8")
         self.assertNotIn("shell=True", transform)
         self.assertIn('["wl-copy", "--", result]', transform)
+
+    def test_calculator_process_and_transport_are_bounded(self):
+        backend = (REPOSITORY / "omaquickcalc_backend.py").read_text(encoding="utf-8")
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn("def _run_qalc_bounded(", backend)
+        self.assertIn("resource.RLIMIT_AS", backend)
+        self.assertNotIn("capture_output=True", backend)
+        self.assertIn("maximumLength: 4096", qml)
 
     def test_transform_in_place_contract(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")

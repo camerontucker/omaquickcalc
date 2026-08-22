@@ -15,6 +15,9 @@ releases are not maintained separately while the plugin is pre-1.0.
 
 - Calculator expressions are passed to the bundled Python evaluator and
   `qalc` as argument arrays, never interpolated into shell commands.
+- Calculator input and backend responses are size-bounded. The `qalc` child
+  also runs with time, address-space, stdout, and stderr limits; oversized or
+  resource-intensive calculations fail without being materialized by the UI.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
 - Normal launcher opens never inspect selected or clipboard text. An approved
