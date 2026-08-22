@@ -18,6 +18,8 @@
   implementation details.
 - Return to onboarding automatically after the visible dependency terminal
   closes instead of losing the setup flow when focus moves to the terminal.
+- Hide onboarding and focus Omarchy's standard centered floating terminal
+  during dependency installation instead of tiling it behind the calculator.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,

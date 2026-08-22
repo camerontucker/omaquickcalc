@@ -70,9 +70,9 @@ omarchy plugin add https://github.com/camerontucker/omaquickcalc.git --enable
 ```
 
 On first launch, a dedicated setup step checks `python`, `libqalculate`, and
-`wl-clipboard`, lists anything missing, and offers to install it in a visible
-terminal. Shortcut setup follows only after those tools are ready. To install
-them yourself:
+`wl-clipboard`, lists anything missing, and offers to install it in a centered
+floating terminal. Shortcut setup follows only after those tools are ready. To
+install them yourself:
 
 ```bash
 omarchy pkg add python libqalculate wl-clipboard
