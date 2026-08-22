@@ -128,6 +128,7 @@ From a source checkout, run `./install.sh`. Before a release:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+./tests/run-qml.sh
 bash -n install.sh uninstall.sh
 omarchy plugin validate .
 /usr/lib/qt6/bin/qmllint -I /usr/share/omarchy/shell OmaQuickCalc.qml

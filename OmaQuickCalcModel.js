@@ -87,6 +87,23 @@ function parseSettings(raw) {
   }
 }
 
+function patchSettings(current, changes) {
+  var next = ({})
+  var source = current && typeof current === "object" ? current : defaults
+  var patch = changes && typeof changes === "object" ? changes : ({})
+  for (var key in source) next[key] = source[key]
+  for (var changedKey in patch) next[changedKey] = patch[changedKey]
+  return parseSettings(JSON.stringify(next))
+}
+
+function wrappedChoice(choices, current, delta) {
+  if (!Array.isArray(choices) || choices.length === 0) return current
+  var index = choices.indexOf(current)
+  if (index < 0) index = 0
+  var offset = Math.round(Number(delta) || 0)
+  return choices[(index + offset % choices.length + choices.length) % choices.length]
+}
+
 function normalizeEntry(value) {
   if (!value || typeof value !== "object") return null
   var expression = String(value.expression || "").trim()

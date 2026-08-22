@@ -42,7 +42,10 @@ Item {
   property int selectedHistoryIndex: -1
   property bool detailOpen: false
   property bool actionMenuOpen: false
+  property bool helpOpen: false
+  property bool preferencesOpen: false
   property int selectedActionIndex: 0
+  property int selectedPreferenceIndex: 0
   property var actionItems: []
   property bool clearConfirmOpen: false
 
@@ -127,14 +130,21 @@ Item {
   readonly property string backendPath: pluginDir + "/omaquickcalc_backend.py"
   readonly property string setupHelperPath: pluginDir + "/omaquickcalc_setup.py"
   readonly property string transformHelperPath: pluginDir + "/omaquickcalc_transform.py"
+  readonly property string contrastHelperPath: pluginDir + "/omaquickcalc_contrast.py"
 
   property string fontFamily: Style.font.menuFamily
   property color background: Color.menu.background
-  property color foreground: Color.menu.text
+  property color themeForeground: Color.menu.text
+  property color contrastCandidate: Color.background
+  property color contrastForeground: themeForeground
+  property color sampledSurface: background
+  readonly property color foreground: contrastForeground
   property color border: Color.menu.border
   property color scrim: Color.menu.scrim
-  property color accent: Color.accent
-  property color urgent: Color.urgent
+  property color themeAccent: Color.accent
+  property color themeUrgent: Color.urgent
+  readonly property color accent: readableTextColor(themeAccent)
+  readonly property color urgent: readableTextColor(themeUrgent)
   readonly property color cardBackground: Util.alpha(background, settings.backgroundOpacity)
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
   readonly property int cornerRadius: Style.cornerRadius
@@ -151,12 +161,42 @@ Item {
   readonly property int actionExtraHeight: actionMenuOpen
     ? Style.space(14) + Math.min(7, Math.max(1, actionItems.length)) * Style.space(42) + Style.space(26)
     : 0
+  readonly property int helpExtraHeight: helpOpen ? Style.space(330) : 0
+  readonly property int preferencesExtraHeight: preferencesOpen ? Style.space(246) : 0
   readonly property int cardWidth: Math.min(Style.space(720), panel.width - Style.gapsOut * 2)
   readonly property int cardHeight: setupOpen ? Style.space(380) : baseCardHeight
-    + Math.max(historyExtraHeight, detailExtraHeight, actionExtraHeight)
+    + Math.max(historyExtraHeight, detailExtraHeight, actionExtraHeight,
+      helpExtraHeight, preferencesExtraHeight)
   readonly property string pluginId: (manifest && manifest.id)
     || "io.github.camerontucker.omaquickcalc"
   readonly property string pluginVersion: (manifest && manifest.version) || "0"
+  property int contrastGeneration: 0
+  property int activeContrastGeneration: -1
+  property string contrastOutput: ""
+  readonly property var preferenceItems: [
+    { id: "opacity", label: "Card opacity",
+      value: Math.round(settings.backgroundOpacity * 100) + "%" },
+    { id: "history", label: "History", value: settings.historyMode === "persistent"
+      ? "Persistent" : (settings.historyMode === "session" ? "This session" : "Off") },
+    { id: "from-currency", label: "Default source currency", value: settings.defaultFromCurrency },
+    { id: "to-currency", label: "Default target currency", value: settings.defaultToCurrency }
+  ]
+  readonly property var shortcutItems: [
+    { keys: "Enter", label: "Copy result and close" },
+    { keys: "Ctrl+Enter", label: "Copy result and stay" },
+    { keys: "Shift+Enter", label: transformActive ? "Replace selected text" : "Copy question and answer" },
+    { keys: "Tab", label: "Use the answer as new input" },
+    { keys: "Alt+Enter", label: "Show calculation details" },
+    { keys: "Ctrl+H", label: "Search calculation history" },
+    { keys: "Ctrl+K", label: "Open actions" },
+    { keys: "Ctrl+,", label: "Open preferences" },
+    { keys: "Esc", label: "Close the current surface" }
+  ]
+  readonly property var opacityChoices: [1, 0.92, 0.8, 0.65, 0.5, 0.35]
+  readonly property var historyChoices: ["persistent", "session", "disabled"]
+  readonly property var currencyChoices: [
+    "USD", "CAD", "EUR", "GBP", "JPY", "AUD", "NZD", "CHF", "CNY", "INR"
+  ]
   readonly property var setupItems: {
     if (setupPage === "choices") return [
       {
@@ -253,11 +293,104 @@ Item {
     }
     if (errorText) return CalcModel.singleLine(errorText)
     if (clipboardChecked && !clipboardAvailable) return "Enter to install clipboard support"
-    return statusText
+    return statusText || (!expression && !transformActive ? "Ctrl+? Help" : "")
   }
 
   onExpressionChanged: {
     if (root.opened && !root.setupOpen) root.scheduleEvaluation()
+  }
+
+  onBackgroundChanged: root.scheduleContrastRefresh()
+  onThemeForegroundChanged: root.scheduleContrastRefresh()
+  onContrastCandidateChanged: root.scheduleContrastRefresh()
+  onScrimChanged: root.scheduleContrastRefresh()
+  onCardBackgroundChanged: root.scheduleContrastRefresh()
+  onCardWidthChanged: root.scheduleContrastRefresh()
+  onCardHeightChanged: root.scheduleContrastRefresh()
+
+  function colorHex(value) {
+    function channel(number) {
+      var encoded = Math.round(Math.max(0, Math.min(1, number)) * 255).toString(16)
+      return encoded.length < 2 ? "0" + encoded : encoded
+    }
+    return "#" + channel(value.r) + channel(value.g) + channel(value.b)
+  }
+
+  function colorLuminance(value) {
+    function linear(channel) {
+      return channel <= 0.03928 ? channel / 12.92
+        : Math.pow((channel + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(value.r) + 0.7152 * linear(value.g)
+      + 0.0722 * linear(value.b)
+  }
+
+  function colorContrast(first, second) {
+    var firstLuminance = root.colorLuminance(first)
+    var secondLuminance = root.colorLuminance(second)
+    var high = Math.max(firstLuminance, secondLuminance)
+    var low = Math.min(firstLuminance, secondLuminance)
+    return (high + 0.05) / (low + 0.05)
+  }
+
+  function bestForeground(surface) {
+    return root.colorContrast(root.themeForeground, surface)
+      >= root.colorContrast(root.contrastCandidate, surface)
+      ? root.themeForeground : root.contrastCandidate
+  }
+
+  function readableTextColor(candidate) {
+    return root.colorContrast(candidate, root.sampledSurface) >= 4.5
+      ? candidate : root.foreground
+  }
+
+  function scheduleContrastRefresh() {
+    // Give the UI an immediate palette-based answer while the wallpaper crop
+    // is sampled asynchronously. A missing ImageMagick simply keeps this safe
+    // fallback, matching Omarchy's transparent-bar behavior.
+    root.sampledSurface = root.background
+    root.contrastForeground = root.bestForeground(root.background)
+    root.contrastGeneration += 1
+    if (root.opened) contrastRefreshTimer.restart()
+  }
+
+  function startContrastRefresh() {
+    if (!root.opened || contrastProcess.running || panel.width < 1 || panel.height < 1)
+      return
+    root.activeContrastGeneration = root.contrastGeneration
+    root.contrastOutput = ""
+    var cardX = Math.max(0, Math.round((panel.width - root.cardWidth) / 2))
+    var cardY = Math.max(Style.gapsOut,
+      Math.round((panel.height - root.cardHeight) * 0.24))
+    contrastProcess.command = [
+      "python3", root.contrastHelperPath,
+      "--screen-width", String(Math.round(panel.width)),
+      "--screen-height", String(Math.round(panel.height)),
+      "--x", String(cardX), "--y", String(cardY),
+      "--width", String(Math.round(root.cardWidth)),
+      "--height", String(Math.round(root.cardHeight)),
+      "--scrim", root.colorHex(root.scrim),
+      "--scrim-opacity", String(root.scrim.a),
+      "--card", root.colorHex(root.background),
+      "--card-opacity", String(root.settings.backgroundOpacity),
+      "--light", root.colorHex(root.themeForeground),
+      "--dark", root.colorHex(root.contrastCandidate)
+    ]
+    contrastProcess.running = true
+  }
+
+  function finishContrastRefresh(exitCode) {
+    var finishedGeneration = root.activeContrastGeneration
+    if (exitCode === 0 && root.activeContrastGeneration === root.contrastGeneration) {
+      var match = root.contrastOutput.trim().match(/^(#[0-9A-Fa-f]{6}) (#[0-9A-Fa-f]{6})$/)
+      if (match) {
+        root.contrastForeground = match[1]
+        root.sampledSurface = match[2]
+      }
+    }
+    root.activeContrastGeneration = -1
+    if (root.opened && root.contrastGeneration !== finishedGeneration)
+      contrastRefreshTimer.restart()
   }
 
   function open(payloadJson) {
@@ -266,11 +399,14 @@ Item {
 
     if (payload.fontFamily) root.fontFamily = String(payload.fontFamily)
     root.opened = true
+    Qt.callLater(function() { root.scheduleContrastRefresh() })
     root.setupForced = Boolean(payload.setup)
     root.historyOpen = false
     root.historyQuery = ""
     root.detailOpen = false
     root.actionMenuOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = false
     root.clearConfirmOpen = false
     root.pendingAction = ""
     root.transformActive = false
@@ -300,6 +436,8 @@ Item {
     root.historyQuery = ""
     root.detailOpen = false
     root.actionMenuOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = false
     root.clearConfirmOpen = false
     root.setupOpen = false
     root.setupForced = false
@@ -660,6 +798,71 @@ Item {
       root.startBackendCheck()
   }
 
+  function updateSettings(changes) {
+    var previousHistoryMode = root.settings.historyMode
+    root.settings = CalcModel.patchSettings(root.settings, changes)
+    root.pendingTimeoutMs = root.settings.previewTimeoutMs
+    if (root.storageReady)
+      configFile.setText(JSON.stringify(root.settings, null, 2) + "\n")
+
+    if (previousHistoryMode !== root.settings.historyMode) {
+      if (root.settings.historyMode === "persistent") historyFile.reload()
+      else root.history = []
+    }
+    if (root.expression.trim()) root.scheduleEvaluation()
+    root.statusText = "Preferences saved"
+  }
+
+  function adjustPreference(delta) {
+    if (!root.preferencesOpen || delta === 0) return
+    var item = root.preferenceItems[root.selectedPreferenceIndex]
+    if (!item) return
+    if (item.id === "opacity") {
+      var opacityIndex = 0
+      var bestDistance = 2
+      for (var index = 0; index < root.opacityChoices.length; index += 1) {
+        var distance = Math.abs(root.opacityChoices[index] - root.settings.backgroundOpacity)
+        if (distance < bestDistance) { bestDistance = distance; opacityIndex = index }
+      }
+      var nextOpacity = root.opacityChoices[
+        (opacityIndex + delta + root.opacityChoices.length) % root.opacityChoices.length]
+      root.updateSettings({ backgroundOpacity: nextOpacity })
+    } else if (item.id === "history") {
+      root.updateSettings({ historyMode: CalcModel.wrappedChoice(root.historyChoices,
+        root.settings.historyMode, delta) })
+    } else {
+      var settingName = item.id === "from-currency" ? "defaultFromCurrency" : "defaultToCurrency"
+      var otherName = item.id === "from-currency" ? "defaultToCurrency" : "defaultFromCurrency"
+      var candidate = CalcModel.wrappedChoice(root.currencyChoices,
+        root.settings[settingName], delta)
+      var changes = ({})
+      changes[settingName] = candidate
+      if (candidate === root.settings[otherName]) changes[otherName] = root.settings[settingName]
+      root.updateSettings(changes)
+    }
+  }
+
+  function togglePreferences() {
+    var opening = !root.preferencesOpen
+    root.historyOpen = false
+    root.detailOpen = false
+    root.actionMenuOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = opening
+    root.selectedPreferenceIndex = 0
+    Qt.callLater(function() { expressionInput.forceActiveFocus() })
+  }
+
+  function toggleHelp() {
+    var opening = !root.helpOpen
+    root.historyOpen = false
+    root.detailOpen = false
+    root.actionMenuOpen = false
+    root.preferencesOpen = false
+    root.helpOpen = opening
+    Qt.callLater(function() { expressionInput.forceActiveFocus() })
+  }
+
   function loadHistory(raw) {
     if (root.settings.historyMode !== "persistent") {
       root.history = []
@@ -734,6 +937,8 @@ Item {
     }
     root.detailOpen = false
     root.actionMenuOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = false
     root.historyOpen = !root.historyOpen
     root.historyQuery = ""
     root.selectedHistoryIndex = root.historyOpen && root.displayHistory.length > 0 ? 0 : -1
@@ -773,6 +978,8 @@ Item {
     if (!root.result && !root.errorText) return
     root.historyOpen = false
     root.actionMenuOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = false
     root.detailOpen = !root.detailOpen
   }
 
@@ -1001,31 +1208,37 @@ Item {
   }
 
   function rebuildActionItems() {
-    var items = [
-      { id: "copy", label: "Copy Answer", value: root.result, enabled: root.clipboardAvailable },
-      { id: "copy-raw", label: "Copy Unformatted", value: root.rawResult || root.result, enabled: root.clipboardAvailable },
-      { id: "copy-equation", label: "Copy Question & Answer", value: "", enabled: root.clipboardAvailable },
-      { id: "reuse", label: "Use Answer as Input", value: "", enabled: true }
-    ]
-    if (root.transformActive)
-      items.splice(1, 0, { id: "replace-selection", label: "Replace Selection", value: "",
-        enabled: root.clipboardAvailable })
-    if (root.swapExpression)
-      items.push({ id: "swap", label: "Swap Units", value: root.swapExpression, enabled: true })
-    if (root.resultKind === "currency")
-      items.push({ id: "refresh-currency", label: "Refresh Currency Rates", value: root.rateDate, enabled: true })
-    for (var index = 0; index < root.resultFormats.length; index += 1) {
-      var format = root.resultFormats[index]
-      items.push({ id: "format", label: "Copy " + String(format.label), value: String(format.value),
-        enabled: root.clipboardAvailable })
+    var items = []
+    if (root.result) {
+      items = [
+        { id: "copy", label: "Copy Answer", value: root.result, enabled: root.clipboardAvailable },
+        { id: "copy-raw", label: "Copy Unformatted", value: root.rawResult || root.result, enabled: root.clipboardAvailable },
+        { id: "copy-equation", label: "Copy Question & Answer", value: "", enabled: root.clipboardAvailable },
+        { id: "reuse", label: "Use Answer as Input", value: "", enabled: true }
+      ]
+      if (root.transformActive)
+        items.splice(1, 0, { id: "replace-selection", label: "Replace Selection", value: "",
+          enabled: root.clipboardAvailable })
+      if (root.swapExpression)
+        items.push({ id: "swap", label: "Swap Units", value: root.swapExpression, enabled: true })
+      if (root.resultKind === "currency")
+        items.push({ id: "refresh-currency", label: "Refresh Currency Rates", value: root.rateDate, enabled: true })
+      for (var index = 0; index < root.resultFormats.length; index += 1) {
+        var format = root.resultFormats[index]
+        items.push({ id: "format", label: "Copy " + String(format.label), value: String(format.value),
+          enabled: root.clipboardAvailable })
+      }
     }
+    items.push({ id: "preferences", label: "Preferences", value: "Ctrl+,", enabled: true })
+    items.push({ id: "help", label: "Keyboard Shortcuts", value: "Ctrl+?", enabled: true })
     root.actionItems = items
   }
 
   function toggleActionMenu() {
-    if (!root.result) return
     root.historyOpen = false
     root.detailOpen = false
+    root.helpOpen = false
+    root.preferencesOpen = false
     root.actionMenuOpen = !root.actionMenuOpen
     root.rebuildActionItems()
     root.selectedActionIndex = 0
@@ -1066,7 +1279,8 @@ Item {
         exchangeRefresh.command = [root.settings.qalcBinary, "--exrates"]
         exchangeRefresh.running = true
       }
-    }
+    } else if (action.id === "preferences") root.togglePreferences()
+    else if (action.id === "help") root.toggleHelp()
   }
 
   function refreshDynamicHistory() {
@@ -1115,6 +1329,10 @@ Item {
       root.clearConfirmOpen = false
     } else if (root.actionMenuOpen) {
       root.actionMenuOpen = false
+    } else if (root.preferencesOpen) {
+      root.preferencesOpen = false
+    } else if (root.helpOpen) {
+      root.helpOpen = false
     } else if (root.detailOpen) {
       root.detailOpen = false
     } else if (root.historyOpen) {
@@ -1232,6 +1450,14 @@ Item {
       root.handleEscape()
       return true
     }
+    if (control && event.key === Qt.Key_Comma) {
+      root.togglePreferences()
+      return true
+    }
+    if (control && (event.key === Qt.Key_Slash || event.key === Qt.Key_Question)) {
+      root.toggleHelp()
+      return true
+    }
     if (control && shift && event.key === Qt.Key_Delete) {
       root.requestClearHistory()
       return true
@@ -1241,13 +1467,26 @@ Item {
       return true
     }
     if (event.key === Qt.Key_Up) {
-      if (root.actionMenuOpen) root.moveActionSelection(-1)
+      if (root.helpOpen) return true
+      if (root.preferencesOpen)
+        root.selectedPreferenceIndex = Math.max(0, root.selectedPreferenceIndex - 1)
+      else if (root.actionMenuOpen) root.moveActionSelection(-1)
       else root.moveHistorySelection(root.historyOpen ? -1 : 0)
       return true
     }
-    if (event.key === Qt.Key_Down && (root.historyOpen || root.actionMenuOpen)) {
-      if (root.actionMenuOpen) root.moveActionSelection(1)
+    if (event.key === Qt.Key_Down
+        && (root.historyOpen || root.actionMenuOpen || root.preferencesOpen)) {
+      if (root.preferencesOpen)
+        root.selectedPreferenceIndex = Math.min(root.preferenceItems.length - 1,
+          root.selectedPreferenceIndex + 1)
+      else if (root.actionMenuOpen) root.moveActionSelection(1)
       else root.moveHistorySelection(1)
+      return true
+    }
+    if (root.helpOpen && (event.key === Qt.Key_Down
+        || event.key === Qt.Key_Left || event.key === Qt.Key_Right)) return true
+    if (root.preferencesOpen && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
+      root.adjustPreference(event.key === Qt.Key_Left ? -1 : 1)
       return true
     }
     if (event.key === Qt.Key_Delete && root.historyOpen) {
@@ -1263,11 +1502,14 @@ Item {
       return true
     }
     if (event.key === Qt.Key_Tab && !shift) {
+      if (root.helpOpen || root.preferencesOpen) return true
       root.submit("reuse")
       return true
     }
     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-      if (root.actionMenuOpen) root.executeSelectedAction()
+      if (root.preferencesOpen) root.adjustPreference(1)
+      else if (root.helpOpen) return true
+      else if (root.actionMenuOpen) root.executeSelectedAction()
       else if (root.historyOpen) root.recallSelectedHistory()
       else if (alt) root.toggleDetail()
       else if (shift && root.transformActive) root.submit("replace-selection")
@@ -1301,6 +1543,30 @@ Item {
     interval: 2000
     repeat: true
     onTriggered: root.startBackendCheck()
+  }
+
+  Timer {
+    id: contrastRefreshTimer
+    interval: 60
+    repeat: false
+    onTriggered: root.startContrastRefresh()
+  }
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.local/state/omarchy/current/background"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: root.scheduleContrastRefresh()
+  }
+
+  Process {
+    id: contrastProcess
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.contrastOutput = text
+    }
+    stderr: StdioCollector { waitForEnd: true }
+    onExited: function(exitCode) { root.finishContrastRefresh(exitCode) }
   }
 
   FileView {
@@ -1572,6 +1838,8 @@ Item {
   PanelWindow {
     id: panel
     visible: root.opened
+    onWidthChanged: root.scheduleContrastRefresh()
+    onHeightChanged: root.scheduleContrastRefresh()
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
     WlrLayershell.namespace: "omaquickcalc"
@@ -1809,6 +2077,8 @@ Item {
             onTextEdited: {
               root.historyOpen = false
               root.actionMenuOpen = false
+              root.helpOpen = false
+              root.preferencesOpen = false
               root.expression = text
             }
             Keys.onPressed: function(event) {
@@ -2252,6 +2522,196 @@ Item {
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
             elide: Text.ElideRight
+          }
+        }
+
+        Item {
+          id: preferencesPane
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: resultRow.bottom
+          anchors.topMargin: Style.space(12)
+          anchors.bottom: parent.bottom
+          visible: root.preferencesOpen && !root.setupOpen
+
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(1, Style.space(1))
+            color: root.border
+            opacity: 0.65
+          }
+
+          Text {
+            id: preferencesTitle
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: Style.space(10)
+            text: "Preferences"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.title
+            font.weight: Font.DemiBold
+          }
+
+          ListView {
+            id: preferencesList
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: preferencesTitle.bottom
+            anchors.topMargin: Style.space(7)
+            anchors.bottom: preferencesHelp.top
+            clip: true
+            interactive: false
+            spacing: Style.space(2)
+            model: root.preferenceItems
+            currentIndex: root.selectedPreferenceIndex
+
+            delegate: Rectangle {
+              id: preferenceRow
+              required property int index
+              required property var modelData
+              width: preferencesList.width
+              height: Style.space(40)
+              radius: Math.max(0, root.cornerRadius - Style.space(3))
+              color: index === root.selectedPreferenceIndex
+                ? Util.alpha(root.accent, 0.13) : "transparent"
+
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(10)
+                anchors.right: preferenceValue.left
+                anchors.rightMargin: Style.spacing.md
+                anchors.verticalCenter: parent.verticalCenter
+                text: preferenceRow.modelData.label
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                elide: Text.ElideRight
+              }
+
+              Text {
+                id: preferenceValue
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                text: "‹  " + preferenceRow.modelData.value + "  ›"
+                color: root.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onEntered: root.selectedPreferenceIndex = preferenceRow.index
+                onClicked: {
+                  root.selectedPreferenceIndex = preferenceRow.index
+                  root.adjustPreference(1)
+                }
+              }
+            }
+          }
+
+          Text {
+            id: preferencesHelp
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            text: "↑↓ select   ←→ change   Ctrl+, close   Any ISO currency remains valid in config.json"
+            color: root.foreground
+            opacity: 0.42
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            elide: Text.ElideRight
+          }
+        }
+
+        Item {
+          id: shortcutHelpPane
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: resultRow.bottom
+          anchors.topMargin: Style.space(12)
+          anchors.bottom: parent.bottom
+          visible: root.helpOpen && !root.setupOpen
+
+          Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.max(1, Style.space(1))
+            color: root.border
+            opacity: 0.65
+          }
+
+          Text {
+            id: shortcutHelpTitle
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.topMargin: Style.space(10)
+            text: "Keyboard shortcuts"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.title
+            font.weight: Font.DemiBold
+          }
+
+          ListView {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: shortcutHelpTitle.bottom
+            anchors.topMargin: Style.space(7)
+            anchors.bottom: shortcutHelpFooter.top
+            interactive: false
+            spacing: Style.space(1)
+            model: root.shortcutItems
+
+            delegate: Item {
+              id: shortcutRow
+              required property var modelData
+              width: ListView.view.width
+              height: Style.space(28)
+
+              Text {
+                width: parent.width * 0.28
+                anchors.left: parent.left
+                anchors.leftMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                text: shortcutRow.modelData.keys
+                color: root.accent
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                font.weight: Font.DemiBold
+              }
+
+              Text {
+                anchors.left: parent.left
+                anchors.leftMargin: parent.width * 0.31
+                anchors.right: parent.right
+                anchors.rightMargin: Style.space(10)
+                anchors.verticalCenter: parent.verticalCenter
+                text: shortcutRow.modelData.label
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                elide: Text.ElideRight
+              }
+            }
+          }
+
+          Text {
+            id: shortcutHelpFooter
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            text: "Ctrl+? or Escape closes this guide"
+            color: root.foreground
+            opacity: 0.42
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
           }
         }
 

@@ -40,7 +40,6 @@ class ReleaseContractTests(unittest.TestCase):
             "LICENSE",
             "README.md",
             "SECURITY.md",
-            "assets/omaquickcalc-demo.mp4",
             "manifest.json",
             "preview.png",
         ):
@@ -48,8 +47,8 @@ class ReleaseContractTests(unittest.TestCase):
                 self.assertTrue((REPOSITORY / relative_path).is_file())
 
         for relative_path in (
-            "install.sh", "uninstall.sh", "omaquickcalc_setup.py",
-            "omaquickcalc_transform.py",
+            "install.sh", "uninstall.sh", "omaquickcalc_contrast.py", "omaquickcalc_setup.py",
+            "omaquickcalc_transform.py", "tests/run-qml.sh",
         ):
             mode = (REPOSITORY / relative_path).stat().st_mode
             self.assertTrue(mode & stat.S_IXUSR, f"{relative_path} must be executable")
@@ -64,11 +63,12 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertGreaterEqual(height, 720)
         self.assertLessEqual(width * height, 40_000_000)
         self.assertLess(preview.stat().st_size, 50 * 1024 * 1024)
-
-        demo = REPOSITORY / "assets" / "omaquickcalc-demo.mp4"
-        header = demo.read_bytes()[:32]
-        self.assertIn(b"ftyp", header)
-        self.assertLess(demo.stat().st_size, 100 * 1024 * 1024)
+        self.assertEqual(
+            preview.read_bytes(),
+            (REPOSITORY / "assets/readme-currency-conversion.png").read_bytes(),
+            "the marketplace preview must stay on the cropped primary calculator story",
+        )
+        self.assertEqual(list(REPOSITORY.rglob("*.mp4")), [], "video assets were intentionally removed")
 
     def test_readme_local_links_resolve(self):
         readme = (REPOSITORY / "README.md").read_text(encoding="utf-8")
@@ -98,7 +98,7 @@ class ReleaseContractTests(unittest.TestCase):
             "time", "unicodedata", "zoneinfo", "__future__",
         }
         for relative_path in (
-            "omaquickcalc_backend.py", "omaquickcalc_setup.py",
+            "omaquickcalc_backend.py", "omaquickcalc_contrast.py", "omaquickcalc_setup.py",
             "omaquickcalc_transform.py",
         ):
             tree = ast.parse((REPOSITORY / relative_path).read_text(encoding="utf-8"))
@@ -152,6 +152,24 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn('root.transformActive ? "⇧↵ Replace" : "↵ Copy"', qml)
         self.assertIn("Math.round(Style.font.heading * 1.5)", qml)
         self.assertIn('onClicked: root.submit("copy-close")', qml)
+
+    def test_translucent_card_tracks_wallpaper_contrast(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn('root.contrastHelperPath', qml)
+        self.assertIn('onBackgroundChanged: root.scheduleContrastRefresh()', qml)
+        self.assertIn('onFileChanged: root.scheduleContrastRefresh()', qml)
+        self.assertIn('readonly property color foreground: contrastForeground', qml)
+        self.assertIn('readonly property color accent: readableTextColor(themeAccent)', qml)
+
+    def test_help_and_preferences_are_discoverable_without_a_result(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertIn('return statusText || (!expression && !transformActive ? "Ctrl+? Help" : "")', qml)
+        self.assertIn('event.key === Qt.Key_Comma', qml)
+        self.assertIn('event.key === Qt.Key_Question', qml)
+        self.assertIn('id: preferencesPane', qml)
+        self.assertIn('id: shortcutHelpPane', qml)
+        self.assertIn('items.push({ id: "preferences"', qml)
+        self.assertNotIn('if (!root.result) return\n    root.historyOpen', qml)
 
 
 if __name__ == "__main__":

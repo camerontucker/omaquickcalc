@@ -27,3 +27,11 @@
   evaluator while the user types.
 - Add automated release-contract, lifecycle, evaluator, shell, Python, and QML
   checks for every push and pull request.
+- Add instant `Ctrl+?` shortcut help and `Ctrl+,` preferences for opacity,
+  history mode, and default currencies without leaving the palette.
+- Adapt text contrast to the active theme, wallpaper, card position, and chosen
+  opacity so transparent cards stay readable as the desktop changes.
+- Add QML model tests, a representative-input latency budget, and stricter
+  storefront asset contracts to the release gate.
+- Replace the marketplace preview with the normal calculator experience and
+  remove the obsolete demo video.
