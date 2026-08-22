@@ -38,6 +38,17 @@ class Evaluation:
     rateSource: str = ""
     rateAgeDays: int = -1
     rateStale: bool = False
+    note: str = ""
+
+
+EASTER_EGGS = {
+    "quattro": ("4", "Fast by design."),
+    "euler": ("2.718281828459045", "eⁱπ + 1 = 0"),
+    "fibonacci": ("1, 1, 2, 3, 5, 8, 13, 21", "The pattern continues."),
+    "gauss": ("5050", "Pair the ends."),
+    "ramanujan": ("1729", "1³ + 12³ = 9³ + 10³"),
+    "dhh": ("37", "Convention over configuration."),
+}
 
 
 ZONE_ALIASES = {
@@ -140,6 +151,16 @@ CURRENCY_ALIASES = {
 def clean_name(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value.strip().lower())
     return " ".join("".join(c for c in normalized if not unicodedata.combining(c)).replace("_", " ").split())
+
+
+def easter_egg_evaluation(expression: str) -> Evaluation | None:
+    name = clean_name(expression)
+    egg = EASTER_EGGS.get(name)
+    if egg is None:
+        return None
+    result, note = egg
+    return Evaluation(True, result, result, kind="easter-egg",
+                      normalizedExpression=name, note=note)
 
 
 def local_zone() -> tzinfo:
@@ -872,6 +893,7 @@ def evaluate(expression: str, qalc: str = "qalc", timeout_ms: int = 250,
     rate_stale_days = max(1, min(365, int(rate_stale_days)))
 
     for evaluator in (
+        easter_egg_evaluation,
         color_evaluation,
         lambda value: timezone_evaluation(value, clock_format),
         lambda value: date_evaluation(value, clock_format),

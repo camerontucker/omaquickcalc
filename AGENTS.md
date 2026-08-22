@@ -59,6 +59,8 @@ change with the permanent plugin ID `io.github.camerontucker.omaquickcalc`.
   terminal after user action. Do not add passwordless sudo, remote executable
   downloads, or hidden package-manager operations.
 - Preserve active Omarchy theme tokens and configurable card transparency.
+  Translucent text must be chosen against the composited wallpaper, scrim, and
+  card—not the theme background alone—and refresh while the overlay is open.
 - Old evaluation processes must never replace newer input; retain generation
   checks when changing evaluation flow.
 
@@ -87,9 +89,9 @@ live shortcut changes as generic verification.
   commands, launcher identity, and tests synchronized when the version or
   plugin ID changes.
 - A release candidate needs a root `preview.png`, accurate install/update/remove
-  instructions, documented dependencies, a clean fresh-clone test, and an
-  authentic demo of the current UI.
-- Keep preview and demo imagery truthful to the shipped interface; do not use a
+  instructions, documented dependencies, a clean fresh-clone test, and
+  authentic captures of the current UI.
+- Keep preview imagery truthful to the shipped interface; do not use a
   synthetic UI mockup as evidence of functionality.
 - Marketplace submission uses category `Productivity`, tags `launcher` and
   `quickshell`, and may suggest the reusable tag `calculator`.

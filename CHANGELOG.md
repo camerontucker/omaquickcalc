@@ -10,6 +10,8 @@
 - Preserve symlinked dotfile-managed Hyprland bindings and reject dangling
   binding symlinks.
 - Add safe launcher upgrades and managed integration removal.
+- Prevent the managed launcher from being recreated while the plugin unloads
+  during removal.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,
@@ -27,3 +29,14 @@
   evaluator while the user types.
 - Add automated release-contract, lifecycle, evaluator, shell, Python, and QML
   checks for every push and pull request.
+- Add instant `Ctrl+?` shortcut help and `Ctrl+,` preferences for opacity,
+  history mode, and default currencies without leaving the palette.
+- Adapt text contrast to the active theme, wallpaper, card position, and chosen
+  opacity so transparent cards stay readable as the desktop changes.
+- Add QML model tests, a representative-input latency budget, and stricter
+  storefront asset contracts to the release gate.
+- Replace the marketplace preview with the normal calculator experience and
+  remove the obsolete demo video.
+- Add a tiny set of name-based Easter eggs with copyable results, a subtle
+  keyboard-help clue, distinct theme-aware micro-interactions, and static
+  reduced-motion variants.

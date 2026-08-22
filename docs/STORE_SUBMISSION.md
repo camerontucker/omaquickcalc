@@ -4,7 +4,7 @@ This draft follows the marketplace's current
 [submission guide](https://github.com/HANCORE-linux/omarchy-plugin-marketplace/blob/main/SUBMISSION.md).
 Do not create the issue until the owner reviews the repository at its final
 commit, confirms all five checklist statements (especially ownership of
-`preview.png` and the demo), and explicitly approves this title and body.
+`preview.png`), and explicitly approves this title and body.
 
 Contest timing: submit and trigger marketplace validation before **Monday,
 August 24, 2026 at 09:00 CEST**. Leave time to correct automated compatibility
@@ -70,8 +70,6 @@ Copy only the contents of the **Issue body** code block to
 
 - [ ] `preview.png` is an authentic capture of the released interface, under
   50 MB and 40 megapixels, and readable at marketplace-card size.
-- [ ] `assets/omaquickcalc-demo.mp4` shows the same released interface and the
-  README demo link opens from GitHub.
 - [ ] README install, launch, update, and removal commands match the final ID.
 - [ ] `manifest.json`, `CHANGELOG.md`, installer arguments, and launcher identity
   carry the same version and plugin ID.

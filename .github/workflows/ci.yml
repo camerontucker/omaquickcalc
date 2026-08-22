@@ -30,12 +30,23 @@ jobs:
       - name: Install native verification tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes desktop-file-utils qalc qt6-declarative-dev-tools
+          sudo apt-get install --yes \
+            desktop-file-utils \
+            qalc \
+            qml6-module-qtqml \
+            qml6-module-qtqml-workerscript \
+            qml6-module-qtquick \
+            qml6-module-qtquick-window \
+            qml6-module-qttest \
+            qt6-declarative-dev-tools
 
       - name: Run unit and lifecycle tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3 -m unittest discover -s tests -v
+
+      - name: Run QML-runtime model and preference contracts
+        run: ./tests/run-qml.sh
 
       - name: Exercise the bundled evaluator
         run: |
@@ -45,8 +56,12 @@ jobs:
 
       - name: Check scripts and Python syntax
         run: |
-          bash -n install.sh uninstall.sh
-          python3 -m py_compile omaquickcalc_backend.py omaquickcalc_setup.py
+          bash -n install.sh uninstall.sh tests/run-qml.sh
+          python3 -m py_compile \
+            omaquickcalc_backend.py \
+            omaquickcalc_contrast.py \
+            omaquickcalc_setup.py \
+            omaquickcalc_transform.py
 
       - name: Parse QML
         # The hosted runner does not ship Quickshell or Omarchy's qs.* modules.

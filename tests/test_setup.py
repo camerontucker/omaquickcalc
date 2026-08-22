@@ -220,7 +220,7 @@ class LifecycleTests(unittest.TestCase):
             self.assertFalse(desktop.exists())
             self.assertNotIn(setup.BINDING_START, bindings.read_text(encoding="utf-8"))
 
-    def test_uninstall_script_cleans_integrations_before_plugin_removal(self):
+    def test_uninstall_script_unloads_before_cleanup_and_removal(self):
         repository = Path(__file__).resolve().parents[1]
         helper = repository / "omaquickcalc_setup.py"
         uninstall = repository / "uninstall.sh"
@@ -234,7 +234,7 @@ class LifecycleTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (binaries / "omarchy").write_text(
-                "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$OMAQUICKCALC_REMOVE_LOG\"\n",
+                "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$OMAQUICKCALC_REMOVE_LOG\"\n",
                 encoding="utf-8",
             )
             (binaries / "hyprctl").chmod(0o755)
@@ -259,8 +259,13 @@ class LifecycleTests(unittest.TestCase):
                 [str(uninstall), "--yes"], check=True, capture_output=True,
                 text=True, env=environment,
             )
-            self.assertEqual(removal_log.read_text(encoding="utf-8").strip(),
-                f"plugin remove {PLUGIN_ID} --yes")
+            self.assertEqual(
+                removal_log.read_text(encoding="utf-8").splitlines(),
+                [
+                    f"plugin disable {PLUGIN_ID}",
+                    f"plugin remove {PLUGIN_ID} --yes",
+                ],
+            )
             self.assertFalse((root / f"data/applications/{PLUGIN_ID}.desktop").exists())
             bindings = (root / "config/hypr/bindings.lua").read_text(encoding="utf-8")
             self.assertNotIn(setup.BINDING_START, bindings)
