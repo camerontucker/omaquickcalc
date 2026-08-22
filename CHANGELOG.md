@@ -12,6 +12,8 @@
 - Add safe launcher upgrades and managed integration removal.
 - Prevent the managed launcher from being recreated while the plugin unloads
   during removal.
+- Replace the competing inline first-run dependency prompt with a dedicated,
+  consent-based calculator-engine step that continues automatically.
 - Adopt the permanent marketplace ID
   `io.github.camerontucker.omaquickcalc`.
 - Expand natural-language calculations, history, actions, formats, transparency,

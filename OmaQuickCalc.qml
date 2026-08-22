@@ -88,6 +88,19 @@ Item {
   property bool clipboardAvailable: false
   property bool clipboardCheckStarted: false
   property bool installRequested: false
+  readonly property bool dependencyChecksComplete: qalcChecked && pythonChecked
+    && clipboardChecked
+  readonly property bool dependenciesAvailable: qalcAvailable && pythonAvailable
+    && clipboardAvailable
+  readonly property bool dependencyInstallSupported: settings.qalcBinary === "qalc"
+  readonly property string missingDependencyPackages: {
+    var missing = []
+    if (qalcChecked && !qalcAvailable)
+      missing.push(settings.qalcBinary === "qalc" ? "libqalculate" : settings.qalcBinary)
+    if (pythonChecked && !pythonAvailable) missing.push("python")
+    if (clipboardChecked && !clipboardAvailable) missing.push("wl-clipboard")
+    return missing.join(", ")
+  }
   property bool exchangeRefreshStarted: false
   property bool exchangeRefreshForResult: false
   property bool copyCloseAfter: false
@@ -201,6 +214,30 @@ Item {
     "USD", "CAD", "EUR", "GBP", "JPY", "AUD", "NZD", "CHF", "CNY", "INR"
   ]
   readonly property var setupItems: {
+    if (setupPage === "dependencies") return [
+      {
+        id: "install-dependencies",
+        label: "Install calculator engine",
+        detail: "Missing: " + (missingDependencyPackages || "required packages")
+          + " · opens a terminal",
+        enabled: dependencyInstallSupported
+      },
+      {
+        id: "close",
+        label: "Not now",
+        detail: "Close OmaQuickCalc without installing anything",
+        enabled: true
+      }
+    ]
+    if (setupPage === "dependency-error") return [
+      {
+        id: "retry-dependencies",
+        label: "Check again",
+        detail: "Retry after fixing the configured calculator path",
+        enabled: true
+      },
+      { id: "close", label: "Close", detail: "Keep your current configuration", enabled: true }
+    ]
     if (setupPage === "choices") return [
       {
         id: "replace",
@@ -258,6 +295,10 @@ Item {
     return []
   }
   readonly property string setupTitle: {
+    if (setupPage === "checking-dependencies") return "Getting OmaQuickCalc ready"
+    if (setupPage === "dependencies") return "Install calculator engine"
+    if (setupPage === "installing-dependencies") return "Installing calculator engine…"
+    if (setupPage === "dependency-error") return "Calculator engine unavailable"
     if (setupPage === "alternatives") return "Choose a shortcut"
     if (setupPage === "confirm") return "Confirm shortcut change"
     if (setupPage === "applying") return "Applying shortcut…"
@@ -265,6 +306,16 @@ Item {
     return "How should OmaQuickCalc launch?"
   }
   readonly property string setupDescription: {
+    if (setupPage === "checking-dependencies")
+      return "Checking the local tools used for calculations and copying results."
+    if (setupPage === "dependencies") {
+      if (!dependencyInstallSupported)
+        return "The custom calculator path is unavailable. Update qalcBinary in " + configPath + "."
+      return "Qalculate powers math, conversions, currencies, and time zones. Installation uses Omarchy and may ask for your password in a terminal."
+    }
+    if (setupPage === "installing-dependencies")
+      return "Finish the package installation in the terminal. Setup will continue automatically when the required tools are ready."
+    if (setupPage === "dependency-error") return setupError
     if (setupPage === "alternatives")
       return "Existing bindings are shown before you confirm any replacement."
     if (setupPage === "confirm")
@@ -582,7 +633,7 @@ Item {
     return operand + " " + query
   }
 
-  function beginLaunchSetup() {
+  function beginShortcutSetup() {
     root.setupOpen = true
     root.setupPage = "choices"
     root.setupSelectedIndex = 0
@@ -599,6 +650,28 @@ Item {
       shortcutStatus.running = true
     }
     Qt.callLater(function() { setupPane.forceActiveFocus() })
+  }
+
+  function showDependencySetup() {
+    root.setupOpen = true
+    root.setupPage = !root.dependencyChecksComplete ? "checking-dependencies"
+      : (root.installRequested ? "installing-dependencies" : "dependencies")
+    root.setupSelectedIndex = 0
+    root.setupError = ""
+    Qt.callLater(function() { setupPane.forceActiveFocus() })
+  }
+
+  function beginLaunchSetup() {
+    if (!root.dependencyChecksComplete || !root.dependenciesAvailable) {
+      root.showDependencySetup()
+      return
+    }
+    root.beginShortcutSetup()
+  }
+
+  function continueAfterDependencies() {
+    if (root.setupForced || !root.launchSetupComplete) root.beginShortcutSetup()
+    else root.focusCalculator()
   }
 
   function loadLaunchState(raw) {
@@ -666,6 +739,20 @@ Item {
     if (index < 0 || index >= root.setupItems.length) return
     var item = root.setupItems[index]
     if (item.enabled === false || root.setupPage === "applying") return
+
+    if (root.setupPage === "dependencies") {
+      if (item.id === "install-dependencies") root.requestDependencyInstall()
+      else if (item.id === "close") root.dismiss()
+      return
+    }
+
+    if (root.setupPage === "dependency-error") {
+      if (item.id === "retry-dependencies") {
+        root.setupPage = "checking-dependencies"
+        root.startBackendCheck()
+      } else if (item.id === "close") root.dismiss()
+      return
+    }
 
     if (root.setupPage === "choices") {
       if (item.id === "replace") {
@@ -1425,7 +1512,7 @@ Item {
     root.backendChecked = true
 
     if (available) {
-      if (!root.installRequested || (root.clipboardChecked && root.clipboardAvailable)) {
+      if (root.dependenciesAvailable) {
         root.installRequested = false
         installerPoll.stop()
       }
@@ -1444,15 +1531,31 @@ Item {
       }
       if (root.pendingExpression) root.startEvaluation()
     }
+
+    if (!root.dependencyChecksComplete || !root.opened) return
+    if (root.dependenciesAvailable) {
+      if (root.setupOpen && [
+          "checking-dependencies", "dependencies", "installing-dependencies",
+          "dependency-error"
+        ].indexOf(root.setupPage) >= 0) root.continueAfterDependencies()
+    } else if (!root.setupOpen || [
+        "checking-dependencies", "dependencies", "installing-dependencies",
+        "dependency-error"
+      ].indexOf(root.setupPage) >= 0) {
+      root.showDependencySetup()
+    }
   }
 
   function requestDependencyInstall() {
     if (!root.qalcAvailable && root.settings.qalcBinary !== "qalc") {
-      root.statusText = "Set a valid qalcBinary in " + root.configPath
+      root.setupError = "Set a valid qalcBinary in " + root.configPath + "."
+      if (root.setupOpen) root.setupPage = "dependency-error"
+      else root.statusText = root.setupError
       return
     }
     if (root.installRequested) return
     root.installRequested = true
+    if (root.setupOpen) root.setupPage = "installing-dependencies"
     Quickshell.execDetached([
       "omarchy-launch-terminal",
       "bash", "-lc",
@@ -2030,7 +2133,11 @@ Item {
           Text {
             anchors.centerIn: parent
             visible: root.setupPage === "applying"
-            text: "Checking Hyprland configuration…"
+              || root.setupPage === "checking-dependencies"
+              || root.setupPage === "installing-dependencies"
+            text: root.setupPage === "applying" ? "Checking Hyprland configuration…"
+              : (root.setupPage === "checking-dependencies" ? "Checking local tools…"
+                : "Complete installation in the terminal")
             color: root.accent
             font.family: root.fontFamily
             font.pixelSize: Style.font.title
@@ -2040,9 +2147,12 @@ Item {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            text: root.setupPage === "choices"
-              ? "↑↓ select   Enter continue   Escape decide later"
-              : "↑↓ select   Enter continue   Escape go back"
+            text: root.setupPage === "choices" || root.setupPage === "dependencies"
+              || root.setupPage === "dependency-error"
+              ? "↑↓ select   Enter continue   Escape close"
+              : (root.setupPage === "checking-dependencies"
+                || root.setupPage === "installing-dependencies"
+                ? "Escape close" : "↑↓ select   Enter continue   Escape go back")
             color: root.foreground
             opacity: 0.42
             font.family: root.fontFamily
