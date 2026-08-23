@@ -69,8 +69,8 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertLess(preview.stat().st_size, 50 * 1024 * 1024)
         self.assertEqual(
             preview.read_bytes(),
-            (REPOSITORY / "assets/readme-tax-report.png").read_bytes(),
-            "the marketplace preview must stay on the cropped primary calculator story",
+            (REPOSITORY / "assets/readme-calculation-history.png").read_bytes(),
+            "the marketplace preview must stay on the cropped everyday calculator story",
         )
         self.assertEqual(list(REPOSITORY.rglob("*.mp4")), [], "video assets were intentionally removed")
 
