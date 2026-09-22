@@ -134,6 +134,21 @@ class ReleaseContractTests(unittest.TestCase):
         )
         self.assertNotIn("onFileChanged:", launcher_view)
 
+    def test_helper_paths_do_not_depend_on_private_manifest_metadata(self):
+        qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
+        self.assertNotIn("manifest.__sourceDir", qml)
+        self.assertIn('String(Qt.resolvedUrl("."))', qml)
+        self.assertIn("decodeURIComponent(", qml)
+        for helper in (
+            "omaquickcalc_backend.py",
+            "omaquickcalc_contrast.py",
+            "omaquickcalc_setup.py",
+            "omaquickcalc_state.py",
+            "omaquickcalc_transform.py",
+        ):
+            with self.subTest(helper=helper):
+                self.assertIn(f'pluginDir + "/{helper}"', qml)
+
     def test_missing_dependencies_use_a_dedicated_first_run_step(self):
         qml = (REPOSITORY / "OmaQuickCalc.qml").read_text(encoding="utf-8")
         self.assertIn('if (setupPage === "dependencies") return [', qml)

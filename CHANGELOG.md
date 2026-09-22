@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 — 2026-09-22
 
 - Harden Transform in Place by rendering captured selections as plain text,
   bounding clipboard-owner output, and targeting replacement paste events to
@@ -11,6 +11,8 @@
   before they reach QML, and render every overlay label as literal plain text.
 - Render the selectable detail pane as plain text, and bound Qalculate rate
   metadata plus shortcut setup files, child output, errors, and JSON responses.
+- Restore Python helper discovery on current Omarchy development builds without
+  relying on private manifest source-directory metadata.
 
 ## 0.6.0 — 2026-08-22
 

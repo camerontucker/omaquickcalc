@@ -150,7 +150,9 @@ Item {
   readonly property string launchStatePath: configDir + "/launch.json"
   readonly property string launcherPath: dataHome + "/applications/"
     + pluginId + ".desktop"
-  readonly property string pluginDir: (manifest && manifest.__sourceDir) || ""
+  readonly property string pluginDir: decodeURIComponent(
+    String(Qt.resolvedUrl(".")).replace(/^file:\/\//, "")
+  ).replace(/\/$/, "")
   readonly property string backendPath: pluginDir + "/omaquickcalc_backend.py"
   readonly property string setupHelperPath: pluginDir + "/omaquickcalc_setup.py"
   readonly property string transformHelperPath: pluginDir + "/omaquickcalc_transform.py"
