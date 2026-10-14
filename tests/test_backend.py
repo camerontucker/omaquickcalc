@@ -194,9 +194,17 @@ class StructuredEvaluatorTests(unittest.TestCase):
         self.assertRegex(next_day.result, r"^[12]:00 AM · .+ · JST$")
 
     def test_rate_metadata_reports_freshness(self):
+        fixtures = Path("tests/fixtures").resolve()
+        read_rate_cache = backend._read_rate_cache
+
+        def read_fixture(path):
+            if path.parent.resolve() != fixtures:
+                raise FileNotFoundError(path)
+            return read_rate_cache(path)
+
         with patch.dict("omaquickcalc_backend.os.environ", {
-            "OMAQUICKCALC_QALCULATE_DATA_DIR": "tests/fixtures"
-        }, clear=False):
+            "OMAQUICKCALC_QALCULATE_DATA_DIR": str(fixtures)
+        }, clear=False), patch("omaquickcalc_backend._read_rate_cache", side_effect=read_fixture):
             rate_date, source, age, stale = backend.rate_metadata(7)
         self.assertEqual(rate_date, "2026-08-20")
         self.assertEqual(source, "Qalculate cache")

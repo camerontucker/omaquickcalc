@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "OmaQuickCalcModel.js" as CalcModel
 
@@ -160,17 +161,17 @@ Item {
   readonly property string stateHelperPath: pluginDir + "/omaquickcalc_state.py"
 
   property string fontFamily: Style.font.menuFamily
-  property color background: Color.menu.background
-  property color themeForeground: Color.menu.text
-  property color contrastCandidate: Color.background
+  property color background: Commons.Color.menu.background
+  property color themeForeground: Commons.Color.menu.text
+  property color contrastCandidate: Commons.Color.background
   property color contrastForeground: themeForeground
   property color sampledSurface: background
   property real easterEggProgress: 0
   readonly property color foreground: contrastForeground
-  property color border: Color.menu.border
-  property color scrim: Color.menu.scrim
-  property color themeAccent: Color.accent
-  property color themeUrgent: Color.urgent
+  property color border: Commons.Color.menu.border
+  property color scrim: Commons.Color.menu.scrim
+  property color themeAccent: Commons.Color.accent
+  property color themeUrgent: Commons.Color.urgent
   readonly property color accent: readableTextColor(themeAccent)
   readonly property color urgent: readableTextColor(themeUrgent)
   readonly property color cardBackground: Util.alpha(background, settings.backgroundOpacity)

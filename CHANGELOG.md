@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.2 — 2026-10-14
+
+- Restore the active Omarchy palette on Qt 6.12 by qualifying the shell Color
+  singleton as `Commons.Color`, fixing black overlays and invisible text.
+- Isolate exchange-rate fixture tests from newer system caches.
+
 ## 0.6.1 — 2026-09-22
 
 - Harden Transform in Place by rendering captured selections as plain text,
