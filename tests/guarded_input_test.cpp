@@ -94,15 +94,19 @@ int main(int argc, char **argv) {
  CHECK(counts.reads == 0);
  std::puts("PASS native IME preedit/commit, undo and committed-length guard");
 
- // Positive control proves the lazy provider exposes the reported Qt mechanism.
+ // The positive control must expose the reported mechanism on affected Qt 6.12+.
+ // Older Qt (including Ubuntu CI's 6.4) checks formats without retrieving text.
  QQmlComponent positive(view.engine());
  positive.setData("import QtQuick\nTextInput { maximumLength: 1 }", QUrl());
  std::unique_ptr<QObject> input(positive.create());
  CHECK(input);
  clipboard->setMimeData(new LazyMime(counts));
- CHECK(counts.reads > 0);
+ CHECK(counts.reads > 0 || QT_VERSION < QT_VERSION_CHECK(6, 12, 0));
  CHECK(input->property("text").toString().isEmpty());
- std::puts("PASS TextInput positive control reads offered payload without paste");
+ if (counts.reads > 0)
+   std::puts("PASS TextInput positive control reads offered payload without paste");
+ else
+   std::printf("INFO Qt %s does not exhibit the Qt 6.12 TextInput payload-read regression\n", qVersion());
  input.reset();
  clipboard->clear();
  return 0;
