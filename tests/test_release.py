@@ -43,6 +43,8 @@ class ReleaseContractTests(unittest.TestCase):
             "data/tax_schemes.json",
             "manifest.json",
             "PlainText.qml",
+            "GuardedInput.qml",
+            "omaquickcalc_paste.py",
             "omaquickcalc_state.py",
             "omaquickcalc_tax.py",
             "preview.png",
@@ -105,6 +107,7 @@ class ReleaseContractTests(unittest.TestCase):
         for relative_path in (
             "omaquickcalc_backend.py", "omaquickcalc_contrast.py", "omaquickcalc_setup.py",
             "omaquickcalc_state.py", "omaquickcalc_tax.py", "omaquickcalc_transform.py",
+            "omaquickcalc_paste.py",
         ):
             tree = ast.parse((REPOSITORY / relative_path).read_text(encoding="utf-8"))
             imported = {

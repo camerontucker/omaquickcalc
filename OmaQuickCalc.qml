@@ -116,6 +116,12 @@ Item {
   property bool exchangeRefreshForResult: false
   property bool copyCloseAfter: false
   property bool copyProcessStarted: false
+  property var pasteTarget: null
+  property int pasteSerial: 0
+  property string pasteOutput: ""
+  property bool pasteStdoutFinished: false
+  property bool pasteExited: false
+  property int pasteExitCode: -1
   property bool transformActive: false
   property string transformToken: ""
   property string transformOperand: ""
@@ -159,6 +165,7 @@ Item {
   readonly property string transformHelperPath: pluginDir + "/omaquickcalc_transform.py"
   readonly property string contrastHelperPath: pluginDir + "/omaquickcalc_contrast.py"
   readonly property string stateHelperPath: pluginDir + "/omaquickcalc_state.py"
+  readonly property string pasteHelperPath: pluginDir + "/omaquickcalc_paste.py"
 
   property string fontFamily: Style.font.menuFamily
   property color background: Commons.Color.menu.background
@@ -571,6 +578,8 @@ Item {
   }
 
   function close() {
+    expressionInput.cancelPaste()
+    historySearchInput.cancelPaste()
     if (root.opened && root.settings.saveOnClose && root.result)
       root.addCurrentToHistory()
     root.opened = false
@@ -1754,6 +1763,42 @@ Item {
     root.dismiss()
   }
 
+  function beginPaste(target, primary, capacity, serial) {
+    if (!root.opened || pasteProcess.running || root.pasteTarget) {
+      root.statusText = "A paste request is already running"
+      return
+    }
+    root.pasteTarget = target
+    root.pasteSerial = serial
+    root.pasteOutput = ""
+    root.pasteStdoutFinished = false
+    root.pasteExited = false
+    root.pasteExitCode = -1
+    pasteProcess.command = ["python3", root.pasteHelperPath,
+      "--max-characters", String(capacity)]
+    if (primary) pasteProcess.command.push("--primary")
+    pasteProcess.running = true
+  }
+
+  function finishPaste() {
+    if (!root.pasteExited || !root.pasteStdoutFinished || !root.pasteTarget) return
+    var target = root.pasteTarget
+    var serial = root.pasteSerial
+    root.pasteTarget = null
+    if (!root.opened) return
+    try {
+      var payload = JSON.parse(root.pasteOutput)
+      if (root.pasteExitCode !== 0 || !payload.ok) {
+        root.statusText = String(payload.error || "Clipboard text is unavailable")
+        return
+      }
+      if (!target.applyPaste(String(payload.text || ""), serial))
+        root.statusText = "Paste cancelled because the input changed"
+    } catch (error) {
+      root.statusText = "Clipboard text is unavailable"
+    }
+  }
+
   function handleInputKey(event) {
     if (root.clearConfirmOpen && clearConfirm.handleKey(event)) return true
 
@@ -2101,6 +2146,34 @@ Item {
   }
 
   Process {
+    id: pasteProcess
+    stdout: StdioCollector {
+      onStreamFinished: {
+        root.pasteOutput = text
+        root.pasteStdoutFinished = true
+        root.finishPaste()
+      }
+    }
+    onExited: function(exitCode) {
+      root.pasteExitCode = exitCode
+      root.pasteExited = true
+      root.finishPaste()
+    }
+    onRunningChanged: {
+      if (!running && root.pasteTarget && !root.pasteExited) {
+        Qt.callLater(function() {
+          if (!pasteProcess.running && root.pasteTarget && !root.pasteExited) {
+            root.pasteExitCode = -1
+            root.pasteExited = true
+            root.pasteStdoutFinished = true
+            root.finishPaste()
+          }
+        })
+      }
+    }
+  }
+
+  Process {
     id: copyProcess
     stdout: StdioCollector { waitForEnd: true }
     stderr: StdioCollector { waitForEnd: true }
@@ -2433,7 +2506,7 @@ Item {
             elide: Text.ElideRight
           }
 
-          TextInput {
+          GuardedInput {
             id: expressionInput
             anchors.left: transformOperandLabel.visible ? transformOperandLabel.right : parent.left
             anchors.leftMargin: transformOperandLabel.visible ? Style.spacing.md : 0
@@ -2441,9 +2514,8 @@ Item {
             anchors.rightMargin: Style.spacing.md
             anchors.verticalCenter: parent.verticalCenter
             height: parent.height
-            verticalAlignment: TextInput.AlignVCenter
             clip: true
-            text: root.expression
+            value: root.expression
             maximumLength: 4096
             color: root.foreground
             opacity: root.result.length > 0 ? 0.72 : 1
@@ -2453,14 +2525,18 @@ Item {
             font.pixelSize: Style.font.heading
             cursorVisible: root.opened && activeFocus
 
-            onTextEdited: {
+            onEdited: function(value) {
               root.historyOpen = false
               root.actionMenuOpen = false
               root.helpOpen = false
               root.preferencesOpen = false
-              root.expression = text
+              root.expression = value
             }
-            Keys.onPressed: function(event) {
+            onPasteRequested: function(primary, capacity, serial) {
+              root.beginPaste(expressionInput, primary, capacity, serial)
+            }
+            onRejected: function(message) { root.statusText = message }
+            onShortcutPressed: function(event) {
               if (root.handleInputKey(event)) event.accepted = true
             }
           }
@@ -2968,23 +3044,27 @@ Item {
               font.pixelSize: Style.font.body
             }
 
-            TextInput {
+            GuardedInput {
               id: historySearchInput
               anchors.fill: parent
               anchors.leftMargin: Style.space(10)
               anchors.rightMargin: Style.space(10)
-              verticalAlignment: TextInput.AlignVCenter
-              text: root.historyQuery
+
+              value: root.historyQuery
               color: root.foreground
               selectionColor: Style.selectionFill
               selectedTextColor: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
-              onTextEdited: {
-                root.historyQuery = text
+              onEdited: function(value) {
+                root.historyQuery = value
                 root.selectedHistoryIndex = root.displayHistory.length > 0 ? 0 : -1
               }
-              Keys.onPressed: function(event) {
+              onPasteRequested: function(primary, capacity, serial) {
+                root.beginPaste(historySearchInput, primary, capacity, serial)
+              }
+              onRejected: function(message) { root.statusText = message }
+              onShortcutPressed: function(event) {
                 if (root.handleInputKey(event)) event.accepted = true
               }
             }

@@ -29,6 +29,17 @@ releases are not maintained separately while the plugin is pre-1.0.
   helper emits a size-bounded JSON response before QML collects it.
 - Results are passed to `wl-copy` as a single argument after `--`; they are not
   evaluated by a shell.
+- Editable fields use plain-text `TextEdit` controls whose automatic paste checks
+  examine MIME format metadata rather than fetching offered clipboard contents.
+  Ctrl+V, Shift+Insert, and middle-click paste run a separate reader only on that
+  explicit gesture. It caps metadata/stderr at 4 KiB, text at 16 KiB and 4096
+  UTF-16 units, reader address space at 128 MiB, and the entire transfer at one
+  second. Invalid, oversized, timed-out, or stale results are rejected before
+  insertion. These guarded fields do not retrieve clipboard text in the shared
+  shell.
+- Guarded paste is a single undo/redo transaction; per-field undo/redo history
+  retains at most 32 bounded text snapshots. Native Qt text entry and IME
+  composition remain enabled.
 - Normal launcher opens never inspect selected or clipboard text. An approved
   keyboard shortcut explicitly captures only byte- and character-bounded text
   containing a number, renders it as plain text, restores the previous

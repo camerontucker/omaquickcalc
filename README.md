@@ -135,11 +135,23 @@ From a source checkout, run `./install.sh`. Before a release:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ./tests/run-qml.sh
+./tests/run-guarded-input.sh
 bash -n install.sh uninstall.sh
 omarchy plugin validate .
 /usr/lib/qt6/bin/qmllint -I /usr/share/omarchy/shell OmaQuickCalc.qml
 git diff --check
 ```
+
+The guarded-input native tests need Qt 6 development headers, `pkg-config`, and
+a C++ compiler. They run on the offscreen platform with finite test clipboard
+providers and process limits; they do not access the desktop clipboard.
+
+For actual Wayland transfers and a captured guarded-widget view, run
+`python3 tests/run-wayland-guarded-input.py --output-dir /tmp/quickcalc-wayland-evidence`.
+This optional test additionally needs Qt Wayland Compositor development files,
+`wayland-scanner`, and the `ext-data-control-v1.xml` protocol. It starts a private
+software compositor, uses only finite test offers, and never connects to the
+live desktop. A sandbox that disallows private Unix-socket binding cannot run it.
 
 Architecture and contributor invariants live in [AGENTS.md](AGENTS.md).
 Release history lives in [CHANGELOG.md](CHANGELOG.md).

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.3 — 2026-10-14
+
+- Guard both editable inputs against Qt's automatic clipboard payload reads,
+  preserving responsive typing when clipboard owners are slow or oversized.
+- Read explicit keyboard and middle-click paste in a separate bounded helper;
+  reject oversized, timed-out, invalid, or stale transfers before insertion.
+- Keep selection replacement paste in one undo/redo transaction, with up to
+  32 input-history snapshots and native typing, selection, and IME support.
+- Add native clipboard/IME checks and an isolated Wayland integration harness.
+
 ## 0.6.2 — 2026-10-14
 
 - Restore the active Omarchy palette on Qt 6.12 by qualifying the shell Color

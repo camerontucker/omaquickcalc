@@ -38,7 +38,9 @@ jobs:
             qml6-module-qtquick \
             qml6-module-qtquick-window \
             qml6-module-qttest \
-            qt6-declarative-dev-tools
+            qt6-declarative-dev-tools \
+            qt6-base-dev \
+            qt6-declarative-dev
 
       - name: Run unit and lifecycle tests
         env:
@@ -47,6 +49,9 @@ jobs:
 
       - name: Run QML-runtime model and preference contracts
         run: ./tests/run-qml.sh
+
+      - name: Verify guarded input against native Qt clipboard and IME events
+        run: ./tests/run-guarded-input.sh
 
       - name: Exercise the bundled evaluator
         run: |
